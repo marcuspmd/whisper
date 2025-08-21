@@ -98,7 +98,8 @@ class AudioDeviceManager:
 
     def get_input_devices(self) -> List[Tuple[int, str]]:
         """
-        Retorna lista de dispositivos com entrada de áudio.
+        Retorna lista de dispositivos com entrada de áudio e dispositivos virtuais.
+        Inclui dispositivos virtuais, agregados e de múltiplas saídas mesmo que não mostrem canais de entrada explícitos.
 
         Returns:
             Lista de tuplas (id, nome) de dispositivos de entrada
@@ -110,8 +111,28 @@ class AudioDeviceManager:
             for idx, dev in enumerate(devices):
                 name = dev.get('name') if isinstance(dev, dict) else getattr(dev, 'name', '')
                 max_in = dev.get('max_input_channels', 0) if isinstance(dev, dict) else getattr(dev, 'max_input_channels', 0)
+                max_out = dev.get('max_output_channels', 0) if isinstance(dev, dict) else getattr(dev, 'max_output_channels', 0)
 
-                if max_in > 0:
+                # Dispositivos com entrada explícita
+                has_input = max_in > 0
+
+                # Dispositivos virtuais e agregados baseado no nome (podem funcionar como entrada)
+                name_lower = name.lower()
+                is_virtual_or_aggregate = any(keyword in name_lower for keyword in [
+                    # Drivers virtuais tradicionais
+                    'blackhole', 'loopback', 'virtual', 'soundflower', 'vb-audio', 'voicemeeter',
+                    # Dispositivos agregados macOS
+                    'aggregate', 'agregado', 'combined', 'conjunto',
+                    # Dispositivos de múltiplas saídas
+                    'múltipla', 'multiple', 'multi-output', 'multi output', 'multi-input',
+                    # Software de áudio
+                    'obs', 'rogue amoeba', 'audio hijack', 'lineout', 'line in', 'line out',
+                    # Outros dispositivos especiais
+                    'composite', 'mixer', 'routing', 'studio', 'interface'
+                ])
+
+                # Incluir se tem entrada OU se é dispositivo virtual/agregado OU tem saída (para agregados)
+                if has_input or is_virtual_or_aggregate or (max_out > 0 and any(keyword in name_lower for keyword in ['aggregate', 'agregado', 'múltipla', 'multiple', 'combined', 'conjunto'])):
                     input_devices.append((idx, name))
 
             return input_devices
