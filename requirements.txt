@@ -8,3 +8,8 @@ numpy>=1.23
 webrtcvad==2.0.10
 # Pin setuptools para evitar o warning do pkg_resources usado por some wheels (temporário)
 setuptools<81
+
+# UI e configuração
+rich>=13.0.0
+textual>=0.40.0
+pyyaml>=6.0

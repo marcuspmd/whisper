@@ -166,8 +166,7 @@ def main():
 
     # Cria e executa aplicação
     try:
-        use_simple = args.simple or not config_manager.config.ui.interactive_mode
-        app = create_app(use_simple_ui=use_simple)
+        app = create_app()
 
         # Executa aplicação
         success = app.run()
