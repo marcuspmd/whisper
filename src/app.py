@@ -261,42 +261,85 @@ class WhisperApplication:
     def _audio_monitor_loop(self):
         """Loop de monitoramento de áudio"""
         last_transcription_time = 0
+        speech_start_time = None
 
         while not self.stop_event.is_set():
             try:
-                # Verifica se é hora de processar áudio
                 current_time = time.time()
-                if current_time - last_transcription_time < self.config.audio.chunk_seconds:
-                    time.sleep(0.1)
-                    continue
 
-                # Obtém chunk de áudio
-                audio_chunk = self.audio_capture.get_audio_chunk(self.config.audio.chunk_seconds)
-
-                if audio_chunk is None or len(audio_chunk) == 0:
-                    time.sleep(0.1)
-                    continue
-
-                # Atualiza nível de áudio na UI, interface web e desktop
-                audio_level = self.audio_capture.get_audio_level()
-                if self.ui:
-                    self.ui.update_audio_level(audio_level)
-                if self.web_interface:
-                    self.web_interface.update_audio_level(audio_level)
-                if self.desktop_interface:
-                    self.desktop_interface.update_audio_level(audio_level)
-
-                # Verifica se há atividade de voz
+                # Se VAD está ativo, usa lógica diferente
                 if isinstance(self.audio_capture, VADAudioCapture):
-                    if not self.audio_capture.has_speech(audio_chunk):
+                    # Obtém chunk pequeno para detecção rápida
+                    detection_chunk = self.audio_capture.get_audio_chunk(0.5)  # 500ms para detecção
+
+                    if detection_chunk is None or len(detection_chunk) == 0:
+                        time.sleep(0.1)
                         continue
+
+                    # Atualiza nível de áudio
+                    audio_level = self.audio_capture.get_audio_level()
+                    if self.ui:
+                        self.ui.update_audio_level(audio_level)
+                    if self.web_interface:
+                        self.web_interface.update_audio_level(audio_level)
+                    if self.desktop_interface:
+                        self.desktop_interface.update_audio_level(audio_level)
+
+                    # Verifica se há fala
+                    if self.audio_capture.has_speech(detection_chunk):
+                        if speech_start_time is None:
+                            speech_start_time = current_time
+
+                        # Aguarda acumular pelo menos 2 segundos de fala antes de transcrever
+                        if current_time - speech_start_time >= 2.0:
+                            # Cooldown: aguarda pelo menos 1 segundo desde a última transcrição
+                            if current_time - last_transcription_time >= 1.0:
+                                # Obtém chunk maior para transcrição
+                                chunk_duration = getattr(self.config.audio, 'vad_chunk_seconds', 2.5)
+                                audio_chunk = self.audio_capture.get_audio_chunk(chunk_duration)
+
+                                if audio_chunk is not None and len(audio_chunk) > 0:
+                                    self._process_transcription(audio_chunk)
+                                    last_transcription_time = current_time
+                                    speech_start_time = None  # Reset para próxima detecção
+                    else:
+                        # Sem fala detectada
+                        if speech_start_time is not None:
+                            # Se estava falando e parou, aguarda um pouco antes de resetar
+                            if current_time - speech_start_time >= 3.0:
+                                speech_start_time = None
+
+                    time.sleep(0.1)  # Verifica a cada 100ms
+
                 else:
+                    # Lógica original para modo sem VAD
+                    if current_time - last_transcription_time < self.config.audio.chunk_seconds:
+                        time.sleep(0.1)
+                        continue
+
+                    # Obtém chunk de áudio
+                    audio_chunk = self.audio_capture.get_audio_chunk(self.config.audio.chunk_seconds)
+
+                    if audio_chunk is None or len(audio_chunk) == 0:
+                        time.sleep(0.1)
+                        continue
+
+                    # Atualiza nível de áudio
+                    audio_level = self.audio_capture.get_audio_level()
+                    if self.ui:
+                        self.ui.update_audio_level(audio_level)
+                    if self.web_interface:
+                        self.web_interface.update_audio_level(audio_level)
+                    if self.desktop_interface:
+                        self.desktop_interface.update_audio_level(audio_level)
+
+                    # Verifica se há atividade de voz
                     if self.audio_capture.is_silent(self.config.audio.silence_threshold):
                         continue
 
-                # Processa transcrição
-                self._process_transcription(audio_chunk)
-                last_transcription_time = current_time
+                    # Processa transcrição
+                    self._process_transcription(audio_chunk)
+                    last_transcription_time = current_time
 
             except Exception as e:
                 logger.error(f"Erro no loop de áudio: {e}")

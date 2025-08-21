@@ -18,6 +18,7 @@ class AudioConfig:
     sample_rate: int = 16000
     channels: int = 1
     chunk_seconds: int = 3
+    vad_chunk_seconds: float = 2.5  # Chunks maiores com VAD para evitar reescrita
     buffer_seconds: int = 15
     overlap_seconds: int = 1
     device_id: Optional[int] = None
@@ -60,7 +61,7 @@ class UIConfig:
 @dataclass
 class AppConfig:
     """Configuração completa da aplicação"""
-    
+
     def __init__(self):
         self.audio = AudioConfig()
         self.transcription = TranscriptionConfig()
@@ -70,41 +71,41 @@ class AppConfig:
 
 class ConfigManager:
     """Gerenciador de configurações"""
-    
+
     def __init__(self, config_dir: Optional[str] = None):
         if config_dir is None:
             config_dir = os.path.expanduser("~/.whisper-transcriber")
-        
+
         self.config_dir = Path(config_dir)
         self.config_file = self.config_dir / "config.yaml"
         self.config = AppConfig()
-        
+
         # Cria diretório se não existir
         self.config_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Carrega configurações
         self.load()
-    
+
     def load(self) -> None:
         """Carrega configurações do arquivo"""
         if not self.config_file.exists():
             logger.info("Arquivo de configuração não encontrado, usando padrões")
             self.save()  # Salva configurações padrão
             return
-        
+
         try:
             with open(self.config_file, 'r', encoding='utf-8') as f:
                 data = yaml.safe_load(f)
-            
+
             if data:
                 self._update_config_from_dict(data)
-            
+
             logger.info(f"Configurações carregadas de {self.config_file}")
-            
+
         except Exception as e:
             logger.error(f"Erro ao carregar configurações: {e}")
             logger.info("Usando configurações padrão")
-    
+
     def save(self) -> None:
         """Salva configurações no arquivo"""
         try:
@@ -114,15 +115,15 @@ class ConfigManager:
                 'translation': asdict(self.config.translation),
                 'ui': asdict(self.config.ui)
             }
-            
+
             with open(self.config_file, 'w', encoding='utf-8') as f:
                 yaml.dump(data, f, default_flow_style=False, allow_unicode=True)
-            
+
             logger.info(f"Configurações salvas em {self.config_file}")
-            
+
         except Exception as e:
             logger.error(f"Erro ao salvar configurações: {e}")
-    
+
     def _update_config_from_dict(self, data: Dict[str, Any]) -> None:
         """Atualiza configuração a partir de dicionário"""
         try:
@@ -130,22 +131,22 @@ class ConfigManager:
                 for key, value in data['audio'].items():
                     if hasattr(self.config.audio, key):
                         setattr(self.config.audio, key, value)
-            
+
             if 'transcription' in data:
                 for key, value in data['transcription'].items():
                     if hasattr(self.config.transcription, key):
                         setattr(self.config.transcription, key, value)
-            
+
             if 'translation' in data:
                 for key, value in data['translation'].items():
                     if hasattr(self.config.translation, key):
                         setattr(self.config.translation, key, value)
-            
+
             if 'ui' in data:
                 for key, value in data['ui'].items():
                     if hasattr(self.config.ui, key):
                         setattr(self.config.ui, key, value)
-                        
+
         except Exception as e:
             logger.error(f"Erro ao atualizar configuração: {e}")
 

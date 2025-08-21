@@ -249,6 +249,12 @@ class VADAudioCapture(AudioCapture):
         """
         Detecta se há fala no áudio usando VAD.
 
+        Sensibilidade VAD:
+        - 0: Muito conservador (só fala muito clara)
+        - 1: Conservador (fala clara)
+        - 2: Moderado (padrão - boa balance)
+        - 3: Agressivo (detecta sussurros e ruído baixo)
+
         Args:
             audio_data: Dados de áudio
 
@@ -256,9 +262,12 @@ class VADAudioCapture(AudioCapture):
             True se detectar fala
         """
         if self.vad is None:
-            # Fallback para RMS
+            # Fallback para RMS - ajustado baseado na agressividade
             rms = np.sqrt(np.mean(audio_data.astype(float) ** 2))
-            return rms > 25.0
+            # Limiares baseados na agressividade do VAD
+            thresholds = {0: 35.0, 1: 25.0, 2: 18.0, 3: 12.0}
+            threshold = thresholds.get(self.vad_aggressiveness, 18.0)
+            return rms > threshold
 
         # WebRTC VAD requer frames de 10, 20 ou 30ms
         frame_ms = 30
@@ -267,13 +276,41 @@ class VADAudioCapture(AudioCapture):
         if len(audio_data) < frame_len:
             return False
 
-        # Usa o último frame disponível
-        last_frame = audio_data[-frame_len:]
+        # Analisa frames sem overlap para evitar detecções excessivas
+        speech_frames = 0
+        total_frames = 0
 
-        try:
-            return self.vad.is_speech(last_frame.tobytes(), self.sample_rate)
-        except Exception as e:
-            logger.warning(f"Erro no VAD: {e}")
-            # Fallback para RMS
-            rms = np.sqrt(np.mean(audio_data.astype(float) ** 2))
-            return rms > 25.0
+        # Divide o áudio em frames sequenciais (sem overlap)
+        for i in range(0, len(audio_data) - frame_len + 1, frame_len):
+            frame = audio_data[i:i + frame_len]
+            if len(frame) < frame_len:
+                continue
+
+            total_frames += 1
+            try:
+                if self.vad.is_speech(frame.tobytes(), self.sample_rate):
+                    speech_frames += 1
+            except Exception:
+                # Se falhar, usa RMS como fallback para este frame
+                rms = np.sqrt(np.mean(frame.astype(float) ** 2))
+                thresholds = {0: 35.0, 1: 25.0, 2: 18.0, 3: 12.0}
+                threshold = thresholds.get(self.vad_aggressiveness, 18.0)
+                if rms > threshold:
+                    speech_frames += 1
+
+        # Critério mais conservador baseado na agressividade
+        if total_frames == 0:
+            return False
+
+        speech_ratio = speech_frames / total_frames
+
+        # Limiares de speech_ratio baseados na agressividade
+        ratio_thresholds = {
+            0: 0.6,   # 60% dos frames devem ter fala (muito conservador)
+            1: 0.4,   # 40% dos frames devem ter fala (conservador)
+            2: 0.25,  # 25% dos frames devem ter fala (moderado)
+            3: 0.15   # 15% dos frames devem ter fala (agressivo)
+        }
+
+        threshold = ratio_thresholds.get(self.vad_aggressiveness, 0.25)
+        return speech_ratio >= threshold

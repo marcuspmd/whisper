@@ -362,7 +362,7 @@ class DesktopInterface:
         current_vad = getattr(self.config.transcription, 'use_vad', False)
         self.vad_enabled_var.set(current_vad)
 
-        vad_cb = ttk.Checkbutton(vad_frame, text="Usar detecção por voz (em vez de 3s fixo)",
+        vad_cb = ttk.Checkbutton(vad_frame, text="Usar detecção por voz (mais rápido que 3s fixo)",
                                 variable=self.vad_enabled_var,
                                 command=self._toggle_vad)
         vad_cb.grid(row=0, column=0, sticky=tk.W)
@@ -370,10 +370,35 @@ class DesktopInterface:
         # Agressividade do VAD
         ttk.Label(vad_frame, text="Sensibilidade:").grid(row=0, column=1, padx=(20, 5), sticky=tk.W)
         self.vad_aggressiveness_var = tk.StringVar()
-        vad_aggr_values = ['0 (Baixa)', '1 (Média-baixa)', '2 (Média)', '3 (Alta)']
+        vad_aggr_values = ['0 (Conservador)', '1 (Moderado)', '2 (Padrão)', '3 (Sensível)']
         self.vad_aggressiveness_combo = ttk.Combobox(vad_frame, textvariable=self.vad_aggressiveness_var,
                                                     values=vad_aggr_values, state="readonly", width=15)
         self.vad_aggressiveness_combo.grid(row=0, column=2, padx=5)
+
+        # Tooltip para explicar sensibilidade
+        def create_tooltip(widget, text):
+            def on_enter(event):
+                tooltip = tk.Toplevel()
+                tooltip.wm_overrideredirect(True)
+                tooltip.wm_geometry(f"+{event.x_root+10}+{event.y_root+10}")
+                label = tk.Label(tooltip, text=text, background="lightyellow",
+                               relief="solid", borderwidth=1, font=("Arial", 9))
+                label.pack()
+                widget.tooltip = tooltip
+
+            def on_leave(event):
+                if hasattr(widget, 'tooltip'):
+                    widget.tooltip.destroy()
+                    del widget.tooltip
+
+            widget.bind("<Enter>", on_enter)
+            widget.bind("<Leave>", on_leave)
+
+        tooltip_text = ("Conservador: Só detecta fala muito clara\n"
+                       "Moderado: Fala normal\n"
+                       "Padrão: Balance entre precisão e sensibilidade\n"
+                       "Sensível: Detecta sussurros, pode pegar ruído")
+        create_tooltip(self.vad_aggressiveness_combo, tooltip_text)
 
         # Definir valor atual de agressividade
         current_aggr = getattr(self.config.transcription, 'vad_aggressiveness', 2)
@@ -467,7 +492,7 @@ class DesktopInterface:
             filename = filedialog.asksaveasfilename(
                 title="Exportar Transcrições",
                 defaultextension=".txt",
-                initialname=default_filename,
+                initialfile=default_filename,
                 filetypes=[
                     ("Arquivo de Texto", "*.txt"),
                     ("Todos os arquivos", "*.*")
@@ -926,16 +951,16 @@ class TeleprompterWindow:
 
         # Manter decorações da janela para facilitar movimento
         self.root.overrideredirect(False)
-        
+
         # Configurar atributos da janela
         self.root.wm_attributes("-topmost", True)
-        
+
         # Aplicar transparência inicial de forma controlada
         self.root.wm_attributes("-alpha", 0.95)  # Ligeiramente transparente, mas controles visíveis
-        
+
         # Configurar cor de fundo
         self.root.configure(bg=self.bg_color)
-        
+
         # Configurar estrutura de transparência
         self._setup_transparent_background()
 
@@ -947,7 +972,7 @@ class TeleprompterWindow:
         # Container principal - sem transparência para manter controles visíveis
         self.main_container = tk.Frame(self.root, bg=self.bg_color)
         self.main_container.pack(fill="both", expand=True, padx=5, pady=5)
-        
+
         # Configurar cor inicial
         self.current_bg = self.bg_color
 
@@ -957,21 +982,21 @@ class TeleprompterWindow:
             # Aplicar transparência à janela, mas manter um mínimo para visibilidade dos controles
             alpha_value = max(0.7, self.transparency)  # Mínimo de 70% para manter controles visíveis
             self.root.wm_attributes("-alpha", alpha_value)
-            
+
             # Ajustar cor de fundo baseada na transparência para efeito visual
             if self.transparency < 0.6:
                 # Alta transparência: fundo bem escuro
                 self.current_bg = "#0a0a0a"
             elif self.transparency < 0.8:
                 # Transparência média: fundo escuro
-                self.current_bg = "#1a1a1a"  
+                self.current_bg = "#1a1a1a"
             else:
                 # Baixa transparência: usar cor configurada
                 self.current_bg = self.bg_color
-                
+
             # Atualizar componentes
             self._update_background_colors()
-                
+
         except Exception as e:
             print(f"Erro ao aplicar transparência: {e}")
             # Fallback
@@ -1019,11 +1044,11 @@ class TeleprompterWindow:
 
         # Botão de transparência (bem visível)
         transparency_btn = tk.Button(
-            config_frame, 
-            text="👁️", 
+            config_frame,
+            text="👁️",
             command=self._toggle_transparency,
-            bg="#333333", 
-            fg="white", 
+            bg="#333333",
+            fg="white",
             width=4,
             font=(self.font_family, 12, "bold")
         )
