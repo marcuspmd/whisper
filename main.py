@@ -71,6 +71,14 @@ Exemplos de uso:
     ui_group = parser.add_argument_group('Configurações de Interface')
     ui_group.add_argument('--simple', action='store_true',
                          help='Modo console simples (sem interface interativa)')
+    ui_group.add_argument('--web', action='store_true',
+                         help='Inicia interface web (acesso via navegador)')
+    ui_group.add_argument('--gui', action='store_true',
+                         help='Inicia interface desktop (aplicativo com janela)')
+    ui_group.add_argument('--web-host', default='0.0.0.0', metavar='HOST',
+                         help='Host para interface web (default: 0.0.0.0)')
+    ui_group.add_argument('--web-port', type=int, default=5000, metavar='PORT',
+                         help='Porta para interface web (default: 5000)')
     ui_group.add_argument('--log-level', default='INFO', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
                          help='Nível de log (default: INFO)')
     ui_group.add_argument('--no-color', action='store_true',
@@ -166,12 +174,92 @@ def main():
 
     # Cria e executa aplicação
     try:
-        use_simple = args.simple or not config_manager.config.ui.interactive_mode
-        app = create_app(use_simple_ui=use_simple)
+        # Verifica modo de interface
+        if args.gui:
+            # Modo interface desktop
+            from src.ui.desktop import DesktopInterface
+            import threading
 
-        # Executa aplicação
-        success = app.run()
-        return 0 if success else 1
+            print("🖥️ Iniciando interface desktop...")
+
+            # Cria aplicação em modo headless (sem interface terminal)
+            app = create_app(use_simple_ui=True, headless=True)
+
+            # Cria interface desktop
+            desktop_interface = DesktopInterface(config_manager.config)
+
+            # Conecta interface desktop à aplicação
+            app.set_desktop_interface(desktop_interface)
+            desktop_interface.set_app(app)
+
+            # Executa interface desktop (bloqueia até janela fechar)
+            desktop_interface.run()
+
+        elif args.web:
+            # Modo interface web
+            from src.ui.web import WebInterface
+            import threading
+
+            print(f"🌐 Iniciando interface web em http://{args.web_host}:{args.web_port}")
+            print("   Pressione Ctrl+C para parar")
+
+            # Cria aplicação em modo headless (sem interface terminal)
+            app = create_app(use_simple_ui=True, headless=True)
+
+            # Cria interface web
+            web_interface = WebInterface(config_manager.config)
+
+            # Conecta interface web à aplicação
+            app.set_web_interface(web_interface)
+
+            # Registra callback de shutdown para que a interface web possa
+            # solicitar a parada limpa da aplicação
+            try:
+                web_interface.set_on_shutdown(app.stop)
+                token = web_interface.get_shutdown_token()
+                print(f"🔐 Shutdown token: {token} (use POST /api/shutdown para encerrar)")
+            except Exception:
+                pass
+
+            # Inicia aplicação em thread separada
+            app_thread = threading.Thread(target=app.run, daemon=True)
+            app_thread.start()
+
+            # Inicia servidor web (bloqueia até Ctrl+C)
+            try:
+                web_interface.run(host=args.web_host, port=args.web_port)
+            except KeyboardInterrupt:
+                # Captura Ctrl+C durante o run do servidor
+                print("\n👋 Interrupção recebida, finalizando...")
+            except Exception as e:
+                print(f"\n❌ Erro no servidor web: {e}")
+            finally:
+                # Garante parada da aplicação e do servidor
+                print("🔄 Iniciando shutdown...")
+                try:
+                    app.stop()
+                except Exception as e:
+                    print(f"Erro durante app.stop(): {e}")
+
+                # Se o app foi executado em thread, aguarda terminar
+                if 'app_thread' in locals() and app_thread.is_alive():
+                    print("⏳ Aguardando threads finalizarem...")
+                    app_thread.join(timeout=5)
+                    if app_thread.is_alive():
+                        print("⚠️ Thread não finalizou, forçando saída...")
+                        import os
+                        os._exit(1)
+
+                print("✅ Shutdown completo")
+
+        else:
+            # Modo terminal (simples ou interativo)
+            use_simple = args.simple or not config_manager.config.ui.interactive_mode
+            app = create_app(use_simple_ui=use_simple)
+
+            # Executa aplicação
+            success = app.run()
+            return 0 if success else 1
 
     except KeyboardInterrupt:
         print("\n👋 Até logo!")

@@ -34,10 +34,11 @@ logger = logging.getLogger(__name__)
 class WhisperApplication:
     """Aplicação principal de transcrição"""
 
-    def __init__(self, use_simple_ui=False):
+    def __init__(self, use_simple_ui=False, headless=False):
         self.config_manager = get_config_manager()
         self.config = self.config_manager.config
         self.use_simple_ui = use_simple_ui
+        self.headless = headless
 
         # Componentes principais
         self.device_manager = AudioDeviceManager()
@@ -45,6 +46,8 @@ class WhisperApplication:
         self.transcriber = None
         self.translation_manager = None
         self.ui = None
+        self.web_interface = None
+        self.desktop_interface = None
 
         # Estado da aplicação
         self.is_running = False
@@ -61,17 +64,67 @@ class WhisperApplication:
 
     def _setup_logging(self):
         """Configura sistema de logging"""
-        if self.config.ui.colored_logs:
-            setup_colored_logging(self.config.ui.log_level)
-        else:
-            import logging
-            logging.basicConfig(level=getattr(logging, self.config.ui.log_level))
+        import logging
+        import os
+        from logging.handlers import RotatingFileHandler
+
+        # Remove todos os handlers existentes
+        root_logger = logging.getLogger()
+        for handler in root_logger.handlers[:]:
+            root_logger.removeHandler(handler)
+
+        # Cria diretório de logs se não existir
+        log_dir = os.path.expanduser("~/.whisper-transcriber/logs")
+        os.makedirs(log_dir, exist_ok=True)
+        log_file = os.path.join(log_dir, "app.log")
+
+        # Configura apenas logging para arquivo para evitar interferir com a interface
+        file_handler = RotatingFileHandler(
+            log_file,
+            maxBytes=10*1024*1024,  # 10MB
+            backupCount=5
+        )
+        file_handler.setFormatter(
+            logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+        )
+
+        # Configura root logger
+        root_logger.setLevel(getattr(logging, self.config.ui.log_level))
+        root_logger.addHandler(file_handler)
+
+        # Log inicial para confirmar que está funcionando
+        logger.info("Sistema de logging configurado - logs em arquivo apenas")
 
     def _setup_signal_handlers(self):
-        """Configura handlers para sinais do sistema"""
+        """Configura handlers de sinais para parada limpa."""
+        self._shutdown_in_progress = False
+
         def signal_handler(signum, frame):
-            logger.info("Sinal de interrupção recebido, finalizando...")
-            self.stop()
+            if self._shutdown_in_progress:
+                logger.warning("Shutdown já em progresso, ignorando sinal adicional")
+                return
+
+            self._shutdown_in_progress = True
+            signal_name = signal.Signals(signum).name
+            logger.info(f"Sinal {signal_name} recebido, iniciando parada...")
+
+            # Força exit após timeout se não conseguir parar normalmente
+            def force_exit():
+                logger.warning("Timeout de shutdown atingido, forçando saída...")
+                import os
+                os._exit(1)
+
+            # Timer de 10 segundos para força exit
+            import threading
+            timer = threading.Timer(10.0, force_exit)
+            timer.start()
+
+            try:
+                self.stop()
+                timer.cancel()  # Cancela timer se conseguiu parar normalmente
+            except Exception as e:
+                logger.error(f"Erro durante stop(): {e}")
+                # Timer vai executar e forçar saída
 
         signal.signal(signal.SIGINT, signal_handler)
         signal.signal(signal.SIGTERM, signal_handler)
@@ -176,7 +229,11 @@ class WhisperApplication:
     def _setup_ui(self) -> bool:
         """Configura interface do usuário"""
         try:
-            if not self.use_simple_ui:
+            if self.headless:
+                # Modo headless - sem interface terminal
+                self.ui = None
+                logger.info("Modo headless - sem interface terminal")
+            elif not self.use_simple_ui:
                 from .ui.interactive import InteractiveConsole
                 self.ui = InteractiveConsole(self.config)
                 logger.info("Interface interativa configurada")
@@ -190,6 +247,16 @@ class WhisperApplication:
         except Exception as e:
             logger.error(f"Erro ao configurar UI: {e}")
             return False
+
+    def set_web_interface(self, web_interface):
+        """Define interface web para comunicação."""
+        self.web_interface = web_interface
+        logger.info("Interface web conectada")
+
+    def set_desktop_interface(self, desktop_interface):
+        """Define interface desktop para comunicação."""
+        self.desktop_interface = desktop_interface
+        logger.info("Interface desktop conectada")
 
     def _audio_monitor_loop(self):
         """Loop de monitoramento de áudio"""
@@ -210,10 +277,14 @@ class WhisperApplication:
                     time.sleep(0.1)
                     continue
 
-                # Atualiza nível de áudio na UI
+                # Atualiza nível de áudio na UI, interface web e desktop
+                audio_level = self.audio_capture.get_audio_level()
                 if self.ui:
-                    audio_level = self.audio_capture.get_audio_level()
                     self.ui.update_audio_level(audio_level)
+                if self.web_interface:
+                    self.web_interface.update_audio_level(audio_level)
+                if self.desktop_interface:
+                    self.desktop_interface.update_audio_level(audio_level)
 
                 # Verifica se há atividade de voz
                 if isinstance(self.audio_capture, VADAudioCapture):
@@ -244,14 +315,36 @@ class WhisperApplication:
 
             # Mostra resultado imediatamente (sem tradução)
             timestamp = time.strftime('%H:%M:%S')
+            confidence = getattr(result, 'confidence', 0.0)
+            current_audio_level = self.audio_capture.get_audio_level() if self.audio_capture else 0.0
 
+            # Adiciona à interface terminal se disponível
             if self.ui:
-                # Adiciona à interface interativa sem tradução primeiro
                 self.ui.add_transcription(
                     text=original_text,
                     language=result.language,
-                    confidence=getattr(result, 'confidence', 0.0),
+                    confidence=confidence,
                     translation=None
+                )
+
+            # Adiciona à interface web se disponível
+            if self.web_interface:
+                self.web_interface.add_transcription(
+                    text=original_text,
+                    language=result.language,
+                    confidence=confidence,
+                    translation=None,
+                    audio_level=current_audio_level
+                )
+
+            # Adiciona à interface desktop se disponível
+            if self.desktop_interface:
+                self.desktop_interface.add_transcription(
+                    text=original_text,
+                    language=result.language,
+                    confidence=confidence,
+                    translation=None,
+                    audio_level=current_audio_level
                 )
 
                 # Inicia tradução assíncrona se habilitada
@@ -261,7 +354,12 @@ class WhisperApplication:
                             translation_result = self.translation_manager.translate(original_text, result.language)
                             if translation_result:
                                 # Atualiza a última transcrição com a tradução
-                                self.ui.update_last_translation(translation_result.translated_text)
+                                if self.ui:
+                                    self.ui.update_last_translation(translation_result.translated_text)
+                                if self.web_interface:
+                                    self.web_interface.update_last_translation(translation_result.translated_text)
+                                if self.desktop_interface:
+                                    self.desktop_interface.update_last_translation(translation_result.translated_text)
                         except Exception as e:
                             logger.error(f"Erro na tradução assíncrona: {e}")
 
@@ -383,6 +481,6 @@ class WhisperApplication:
         return True
 
 
-def create_app(use_simple_ui=False) -> WhisperApplication:
+def create_app(use_simple_ui=False, headless=False) -> WhisperApplication:
     """Factory function para criar aplicação"""
-    return WhisperApplication(use_simple_ui=use_simple_ui)
+    return WhisperApplication(use_simple_ui=use_simple_ui, headless=headless)
