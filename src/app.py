@@ -47,8 +47,8 @@ class WhisperApplication:
         self.audio_capture = None
         self.transcriber = None
         self.translation_manager = None
-        self.ui = None
-        self.web_interface = None
+        # Interface de usuário
+        self.ui_interface = None
         self.desktop_interface = None
 
         # Estado da aplicação
@@ -264,10 +264,10 @@ class WhisperApplication:
             logger.error(f"Erro ao configurar UI: {e}")
             return False
 
-    def set_web_interface(self, web_interface):
-        """Define interface web para comunicação."""
-        self.web_interface = web_interface
-        logger.info("Interface web conectada")
+    def set_ui_interface(self, ui_interface):
+        """Define interface de usuário para comunicação."""
+        self.ui_interface = ui_interface
+        logger.info("Interface de usuário conectada")
 
     def set_desktop_interface(self, desktop_interface):
         """Define interface desktop para comunicação."""
@@ -298,8 +298,6 @@ class WhisperApplication:
                     audio_level = self.audio_capture.get_audio_level()
                     if self.ui:
                         self.ui.update_audio_level(audio_level)
-                    if self.web_interface:
-                        self.web_interface.update_audio_level(audio_level)
                     if self.desktop_interface:
                         self.desktop_interface.update_audio_level(audio_level)
 
@@ -357,8 +355,6 @@ class WhisperApplication:
                     audio_level = self.audio_capture.get_audio_level()
                     if self.ui:
                         self.ui.update_audio_level(audio_level)
-                    if self.web_interface:
-                        self.web_interface.update_audio_level(audio_level)
                     if self.desktop_interface:
                         self.desktop_interface.update_audio_level(audio_level)
 
@@ -403,15 +399,6 @@ class WhisperApplication:
                     language=result.language,
                     confidence=confidence,
                     translation=None,
-                )
-
-            # Adiciona à interface web se disponível
-            if self.web_interface:
-                self.web_interface.add_transcription(
-                    text=original_text,
-                    language=result.language,
-                    confidence=confidence,
-                    translation=None,
                     audio_level=current_audio_level,
                 )
 
@@ -437,10 +424,6 @@ class WhisperApplication:
                                 # Atualiza a última transcrição com a tradução
                                 if self.ui:
                                     self.ui.update_last_translation(
-                                        translation_result.translated_text
-                                    )
-                                if self.web_interface:
-                                    self.web_interface.update_last_translation(
                                         translation_result.translated_text
                                     )
                                 if self.desktop_interface:

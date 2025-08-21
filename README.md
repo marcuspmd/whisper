@@ -26,7 +26,6 @@ Um aplicativo profissional de transcrição de áudio em tempo real usando OpenA
 ### 🎨 Interface Moderna
 - **Design responsivo** com CustomTkinter
 - **Tema escuro/claro** configurável
-- **Interface web** opcional para acesso remoto
 - **Controles intuitivos** e acessíveis
 
 ### 🔧 Recursos Técnicos
@@ -108,9 +107,6 @@ python main.py --model base --language pt
 # Com tradução
 python main.py --translate-to pt --model small
 
-# Interface web
-python main.py --web --web-port 8080
-
 # Modo teleprompter
 python main.py --teleprompter --transparent
 
@@ -129,10 +125,6 @@ docker run -it --rm \
   -v /tmp/.X11-unix:/tmp/.X11-unix \
   --device /dev/snd \
   whisper-transcriber
-
-# Execute interface web
-docker run -it --rm -p 8080:8080 \
-  whisper-transcriber python main.py --web --web-port 8080
 ```
 
 ## 🛠️ Desenvolvimento
@@ -187,8 +179,7 @@ whisper-transcriber/
 │   ├── audio/             # Módulos de áudio
 │   ├── config/            # Gerenciamento de configuração
 │   ├── ui/                # Interface do usuário
-│   ├── utils/             # Utilitários diversos
-│   └── web/               # Interface web
+│   └── utils/             # Utilitários diversos
 ├── tests/                 # Testes automatizados
 ├── docs/                  # Documentação
 ├── scripts/               # Scripts de build e deployment
@@ -249,11 +240,6 @@ WHISPER_DEVICE=cpu            # Dispositivo (cpu/cuda)
 UI_THEME=dark                 # Tema da interface
 UI_SCALING=1.0               # Escala da interface
 TELEPROMPTER_SPEED=50        # Velocidade do teleprompter
-
-# Configurações web
-WEB_HOST=0.0.0.0             # Host da interface web
-WEB_PORT=8080                # Porta da interface web
-WEB_DEBUG=false              # Modo debug
 
 # Configurações de log
 LOG_LEVEL=INFO               # Nível de log

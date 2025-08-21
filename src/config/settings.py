@@ -21,7 +21,7 @@ class AudioConfig:
     sample_rate: int = 16000
     channels: int = 1
     chunk_seconds: int = 3
-    vad_chunk_seconds: float = 2.5  # Chunks maiores com VAD para evitar reescrita
+    vad_chunk_seconds: float = 1.5  # Chunks menores quando VAD está ativo
     buffer_seconds: int = 15
     overlap_seconds: int = 1
     device_id: Optional[int] = None

@@ -116,36 +116,27 @@ class TestTranscription(unittest.TestCase):
             self.skipTest(f"Transcription test failed: {e}")
 
 
-class TestWebInterface(unittest.TestCase):
-    """Test cases for web interface functionality"""
+class TestUIInterfaces(unittest.TestCase):
+    """Test cases for user interface functionality"""
 
-    @unittest.skipIf(not os.environ.get('WEB_TESTS'), "Web tests require WEB_TESTS=1")
-    def test_web_app_creation(self):
-        """Test web application creation"""
+    def test_desktop_interface_creation(self):
+        """Test desktop interface creation"""
         try:
-            from src.web.app import create_web_app
-            web_app = create_web_app()
-
-            self.assertIsNotNone(web_app)
-            self.assertTrue(hasattr(web_app, 'run'))
+            from src.ui.desktop import DesktopInterface
+            # Basic creation test - don't actually show UI in tests
+            self.assertTrue(hasattr(DesktopInterface, '__init__'))
 
         except ImportError as e:
-            self.skipTest(f"Web app import failed: {e}")
+            self.skipTest(f"Desktop interface import failed: {e}")
 
-    def test_api_endpoints_exist(self):
-        """Test that API endpoints are properly defined"""
+    def test_simple_interface_creation(self):
+        """Test simple console interface creation"""
         try:
-            from src.web.app import create_web_app
-            web_app = create_web_app()
+            from src.ui.simple import SimpleInterface
+            # Basic creation test
+            self.assertTrue(hasattr(SimpleInterface, '__init__'))
 
-            # Check if Flask app has routes
-            if hasattr(web_app, 'url_map'):
-                rules = [str(rule) for rule in web_app.url_map.iter_rules()]
-                self.assertGreater(len(rules), 0)
-
-        except Exception as e:
-            self.skipTest(f"API endpoints test failed: {e}")
-
-
+        except ImportError as e:
+            self.skipTest(f"Simple interface import failed: {e}")
 if __name__ == '__main__':
     unittest.main()

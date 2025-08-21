@@ -7,8 +7,8 @@ Supports desktop GUI, web interface, and console modes.
 """
 
 __version__ = "1.0.0"
-__author__ = "Marcus Pereira"
-__email__ = "marcus@example.com"
+__author__ = "Marcus Paulo M Dias"
+__email__ = "marcusmazzon@gmail.com"
 __license__ = "MIT"
 
 from .app import WhisperApplication, create_app

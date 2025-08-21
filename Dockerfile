@@ -68,7 +68,7 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
 CMD ["python", "main.py", "--web", "--web-host", "0.0.0.0", "--web-port", "3000"]
 
 # Labels
-LABEL maintainer="Marcus Pereira <marcus@example.com>" \
+LABEL maintainer="Marcus Paulo M Dias <marcusmazzon@gmail.com>" \
       description="Real-time audio transcription with Whisper AI" \
       version="1.0.0" \
       org.opencontainers.image.title="Whisper Transcriber" \

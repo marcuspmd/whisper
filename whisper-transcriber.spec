@@ -5,14 +5,13 @@ import os
 from pathlib import Path
 
 # Add src to path
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+spec_dir = os.path.dirname(os.path.abspath(SPEC))
+sys.path.insert(0, os.path.join(spec_dir, "src"))
 
 block_cipher = None
 
 # Data files to include
 datas = [
-    ('src/ui/static', 'ui/static'),
-    ('src/ui/templates', 'ui/templates'),
     ('requirements.txt', '.'),
     ('README.md', '.'),
     ('LICENSE', '.'),
@@ -33,8 +32,8 @@ hiddenimports = [
     'src.translation.engines',
     'src.ui',
     'src.ui.desktop',
-    'src.ui.web',
     'src.ui.simple',
+    'src.ui.interactive',
     'src.utils',
     'src.utils.logger',
     'faster_whisper',
@@ -43,8 +42,6 @@ hiddenimports = [
     'torchaudio',
     'sounddevice',
     'numpy',
-    'flask',
-    'waitress',
     'googletrans',
     'webrtcvad',
     'soundfile',

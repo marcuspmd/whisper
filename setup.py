@@ -29,8 +29,8 @@ def get_requirements():
 setup(
     name="whisper-transcriber",
     version=get_version(),
-    author="Marcus Pereira",
-    author_email="marcus@example.com",
+    author="Marcus Paulo M Dias",
+    author_email="marcusmazzon@gmail.com",
     description="Real-time audio transcription with Whisper AI and translation",
     long_description=get_long_description(),
     long_description_content_type="text/markdown",
