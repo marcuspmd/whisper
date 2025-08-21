@@ -891,8 +891,9 @@ class DesktopInterface:
                     self.app.start()
                     self.root.after(0, lambda: self._on_app_started())
                 except Exception as e:
-                    logger.error(f"Erro ao iniciar aplicação: {e}")
-                    self.root.after(0, lambda: self._on_app_error(str(e)))
+                    error_msg = str(e)
+                    logger.error(f"Erro ao iniciar aplicação: {error_msg}")
+                    self.root.after(0, lambda: self._on_app_error(error_msg))
 
             app_thread = threading.Thread(target=start_app, daemon=True)
             app_thread.start()

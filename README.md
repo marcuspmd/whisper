@@ -1,10 +1,10 @@
 # 🎙️ Whisper Transcriber
 
-[![Tests](https://github.com/yourusername/whisper-transcriber/actions/workflows/tests.yml/badge.svg)](https://github.com/yourusername/whisper-transcriber/actions/workflows/tests.yml)
-[![Build and Release](https://github.com/yourusername/whisper-transcriber/actions/workflows/build-and-release.yml/badge.svg)](https://github.com/yourusername/whisper-transcriber/actions/workflows/build-and-release.yml)
+[![Tests](https://github.com/marcuspmd/whisper-transcriber/actions/workflows/tests.yml/badge.svg)](https://github.com/marcuspmd/whisper-transcriber/actions/workflows/tests.yml)
+[![Build and Release](https://github.com/marcuspmd/whisper-transcriber/actions/workflows/build-and-release.yml/badge.svg)](https://github.com/marcuspmd/whisper-transcriber/actions/workflows/build-and-release.yml)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Docker](https://img.shields.io/badge/docker-supported-blue.svg)](https://hub.docker.com/r/yourusername/whisper-transcriber)
+[![Docker](https://img.shields.io/badge/docker-supported-blue.svg)](https://hub.docker.com/r/marcuspmd/whisper-transcriber)
 
 Um aplicativo profissional de transcrição de áudio em tempo real usando OpenAI Whisper com interface gráfica moderna, recursos avançados de teleprompter e suporte multi-plataforma.
 
@@ -41,7 +41,7 @@ Um aplicativo profissional de transcrição de áudio em tempo real usando OpenA
 
 ```bash
 # Clone o repositório
-git clone https://github.com/yourusername/whisper-transcriber.git
+git clone https://github.com/marcuspmd/whisper-transcriber.git
 cd whisper-transcriber
 
 # Instale dependências do sistema e Python
@@ -94,7 +94,7 @@ pip install -r requirements.txt
 
 ### Interface Gráfica (GUI)
 ```bash
-python main.py
+python main.py --gui
 # ou
 make run
 ```
@@ -133,7 +133,7 @@ docker run -it --rm \
 
 ```bash
 # Clone e configure
-git clone https://github.com/yourusername/whisper-transcriber.git
+git clone https://github.com/marcuspmd/whisper-transcriber.git
 cd whisper-transcriber
 
 # Instale dependências de desenvolvimento
@@ -217,8 +217,8 @@ make docker-build
 docker buildx build --platform linux/amd64,linux/arm64 -t whisper-transcriber .
 
 # Publicar no Docker Hub
-docker tag whisper-transcriber yourusername/whisper-transcriber:latest
-docker push yourusername/whisper-transcriber:latest
+docker tag whisper-transcriber marcuspmd/whisper-transcriber:latest
+docker push marcuspmd/whisper-transcriber:latest
 ```
 
 ## 🔧 Configuração Avançada
@@ -248,44 +248,39 @@ LOG_FILE=logs/app.log        # Arquivo de log
 
 ### Arquivo de Configuração
 
-Crie um arquivo `config/settings.json`:
+O arquivo de configuração é gerado automaticamente em `~/.whisper-transcriber/config.yaml`:
 
-```json
-{
-  "audio": {
-    "device_index": 0,
-    "sample_rate": 16000,
-    "chunk_size": 1024,
-    "vad_aggressiveness": 2
-  },
-  "whisper": {
-    "model": "base",
-    "language": "auto",
-    "device": "cpu",
-    "compute_type": "int8"
-  },
-  "ui": {
-    "theme": "dark",
-    "scaling": 1.0,
-    "always_on_top": false
-  },
-  "teleprompter": {
-    "speed": 50,
-    "transparency": 0.8,
-    "font_size": 16,
-    "auto_scroll": true
-  },
-  "translation": {
-    "enabled": true,
-    "target_language": "pt",
-    "provider": "google"
-  },
-  "export": {
-    "format": "txt",
-    "include_timestamps": true,
-    "include_confidence": false
-  }
-}
+```yaml
+audio:
+  device_id: null
+  device_name: null
+  sample_rate: 16000
+  chunk_seconds: 3
+
+transcription:
+  model_name: base
+  device: cpu
+  language: null
+  use_vad: false
+  vad_aggressiveness: 2
+
+translation:
+  enabled: true
+  mode: local
+  target_language: pt
+
+ui:
+  interactive_mode: true
+  log_level: INFO
+  colored_logs: true
+  theme: dark
+  scaling: 1.0
+
+teleprompter:
+  speed: 50
+  transparency: 0.8
+  font_size: 16
+  auto_scroll: true
 ```
 
 ## 🤝 Contribuindo
@@ -402,10 +397,10 @@ Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE](LICE
 
 ## 🔗 Links Úteis
 
-- [Documentação Completa](https://yourusername.github.io/whisper-transcriber/)
-- [Issues e Bug Reports](https://github.com/yourusername/whisper-transcriber/issues)
-- [Discussões da Comunidade](https://github.com/yourusername/whisper-transcriber/discussions)
-- [Changelog](https://github.com/yourusername/whisper-transcriber/releases)
+- [Documentação Completa](https://marcuspmd.github.io/whisper-transcriber/)
+- [Issues e Bug Reports](https://github.com/marcuspmd/whisper-transcriber/issues)
+- [Discussões da Comunidade](https://github.com/marcuspmd/whisper-transcriber/discussions)
+- [Changelog](https://github.com/marcuspmd/whisper-transcriber/releases)
 
 ---
 
