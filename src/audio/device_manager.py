@@ -1,8 +1,10 @@
 """
 Audio device management
 """
+
+from typing import Any, Dict, List, Optional, Tuple
+
 import sounddevice as sd
-from typing import List, Tuple, Optional, Dict, Any
 
 
 class AudioDeviceManager:
@@ -38,9 +40,19 @@ class AudioDeviceManager:
         print("-" * 50)
 
         for idx, dev in enumerate(devices):
-            name = dev.get('name') if isinstance(dev, dict) else getattr(dev, 'name', '')
-            max_in = dev.get('max_input_channels', 0) if isinstance(dev, dict) else getattr(dev, 'max_input_channels', 0)
-            max_out = dev.get('max_output_channels', 0) if isinstance(dev, dict) else getattr(dev, 'max_output_channels', 0)
+            name = (
+                dev.get("name") if isinstance(dev, dict) else getattr(dev, "name", "")
+            )
+            max_in = (
+                dev.get("max_input_channels", 0)
+                if isinstance(dev, dict)
+                else getattr(dev, "max_input_channels", 0)
+            )
+            max_out = (
+                dev.get("max_output_channels", 0)
+                if isinstance(dev, dict)
+                else getattr(dev, "max_output_channels", 0)
+            )
 
             in_str = f"{max_in:2d}" if max_in > 0 else "--"
             out_str = f"{max_out:2d}" if max_out > 0 else "--"
@@ -65,10 +77,21 @@ class AudioDeviceManager:
 
         candidates = []
         for idx, dev in enumerate(devices):
-            name = dev.get('name') if isinstance(dev, dict) else getattr(dev, 'name', None)
-            max_in = dev.get('max_input_channels') if isinstance(dev, dict) else getattr(dev, 'max_input_channels', 0)
+            name = (
+                dev.get("name") if isinstance(dev, dict) else getattr(dev, "name", None)
+            )
+            max_in = (
+                dev.get("max_input_channels")
+                if isinstance(dev, dict)
+                else getattr(dev, "max_input_channels", 0)
+            )
 
-            if name and (name_substring.lower() in name.lower()) and max_in and max_in > 0:
+            if (
+                name
+                and (name_substring.lower() in name.lower())
+                and max_in
+                and max_in > 0
+            ):
                 candidates.append((idx, name))
 
         if candidates:
@@ -89,8 +112,16 @@ class AudioDeviceManager:
             devices = self.list_devices()
             if 0 <= device_id < len(devices):
                 dev = devices[device_id]
-                name = dev.get('name') if isinstance(dev, dict) else getattr(dev, 'name', '')
-                max_in = dev.get('max_input_channels', 0) if isinstance(dev, dict) else getattr(dev, 'max_input_channels', 0)
+                name = (
+                    dev.get("name")
+                    if isinstance(dev, dict)
+                    else getattr(dev, "name", "")
+                )
+                max_in = (
+                    dev.get("max_input_channels", 0)
+                    if isinstance(dev, dict)
+                    else getattr(dev, "max_input_channels", 0)
+                )
                 return (device_id, name, max_in)
         except RuntimeError:
             pass
@@ -109,30 +140,83 @@ class AudioDeviceManager:
             input_devices = []
 
             for idx, dev in enumerate(devices):
-                name = dev.get('name') if isinstance(dev, dict) else getattr(dev, 'name', '')
-                max_in = dev.get('max_input_channels', 0) if isinstance(dev, dict) else getattr(dev, 'max_input_channels', 0)
-                max_out = dev.get('max_output_channels', 0) if isinstance(dev, dict) else getattr(dev, 'max_output_channels', 0)
+                name = (
+                    dev.get("name")
+                    if isinstance(dev, dict)
+                    else getattr(dev, "name", "")
+                )
+                max_in = (
+                    dev.get("max_input_channels", 0)
+                    if isinstance(dev, dict)
+                    else getattr(dev, "max_input_channels", 0)
+                )
+                max_out = (
+                    dev.get("max_output_channels", 0)
+                    if isinstance(dev, dict)
+                    else getattr(dev, "max_output_channels", 0)
+                )
 
                 # Dispositivos com entrada explícita
                 has_input = max_in > 0
 
                 # Dispositivos virtuais e agregados baseado no nome (podem funcionar como entrada)
                 name_lower = name.lower()
-                is_virtual_or_aggregate = any(keyword in name_lower for keyword in [
-                    # Drivers virtuais tradicionais
-                    'blackhole', 'loopback', 'virtual', 'soundflower', 'vb-audio', 'voicemeeter',
-                    # Dispositivos agregados macOS
-                    'aggregate', 'agregado', 'combined', 'conjunto',
-                    # Dispositivos de múltiplas saídas
-                    'múltipla', 'multiple', 'multi-output', 'multi output', 'multi-input',
-                    # Software de áudio
-                    'obs', 'rogue amoeba', 'audio hijack', 'lineout', 'line in', 'line out',
-                    # Outros dispositivos especiais
-                    'composite', 'mixer', 'routing', 'studio', 'interface'
-                ])
+                is_virtual_or_aggregate = any(
+                    keyword in name_lower
+                    for keyword in [
+                        # Drivers virtuais tradicionais
+                        "blackhole",
+                        "loopback",
+                        "virtual",
+                        "soundflower",
+                        "vb-audio",
+                        "voicemeeter",
+                        # Dispositivos agregados macOS
+                        "aggregate",
+                        "agregado",
+                        "combined",
+                        "conjunto",
+                        # Dispositivos de múltiplas saídas
+                        "múltipla",
+                        "multiple",
+                        "multi-output",
+                        "multi output",
+                        "multi-input",
+                        # Software de áudio
+                        "obs",
+                        "rogue amoeba",
+                        "audio hijack",
+                        "lineout",
+                        "line in",
+                        "line out",
+                        # Outros dispositivos especiais
+                        "composite",
+                        "mixer",
+                        "routing",
+                        "studio",
+                        "interface",
+                    ]
+                )
 
                 # Incluir se tem entrada OU se é dispositivo virtual/agregado OU tem saída (para agregados)
-                if has_input or is_virtual_or_aggregate or (max_out > 0 and any(keyword in name_lower for keyword in ['aggregate', 'agregado', 'múltipla', 'multiple', 'combined', 'conjunto'])):
+                if (
+                    has_input
+                    or is_virtual_or_aggregate
+                    or (
+                        max_out > 0
+                        and any(
+                            keyword in name_lower
+                            for keyword in [
+                                "aggregate",
+                                "agregado",
+                                "múltipla",
+                                "multiple",
+                                "combined",
+                                "conjunto",
+                            ]
+                        )
+                    )
+                ):
                     input_devices.append((idx, name))
 
             return input_devices

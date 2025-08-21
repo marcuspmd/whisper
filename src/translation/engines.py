@@ -1,9 +1,10 @@
 """
 Translation engines and utilities
 """
-from abc import ABC, abstractmethod
-from typing import Optional, Dict, Any
+
 import logging
+from abc import ABC, abstractmethod
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -11,7 +12,12 @@ logger = logging.getLogger(__name__)
 class TranslationResult:
     """Resultado de tradução"""
 
-    def __init__(self, translated_text: str, source_language: Optional[str] = None, target_language: str = "pt"):
+    def __init__(
+        self,
+        translated_text: str,
+        source_language: Optional[str] = None,
+        target_language: str = "pt",
+    ):
         self.translated_text = translated_text
         self.source_language = source_language
         self.target_language = target_language
@@ -29,7 +35,9 @@ class BaseTranslator(ABC):
         self.cache = {}  # Cache simples de traduções
 
     @abstractmethod
-    def translate(self, text: str, source_language: Optional[str] = None) -> Optional[TranslationResult]:
+    def translate(
+        self, text: str, source_language: Optional[str] = None
+    ) -> Optional[TranslationResult]:
         """Traduz texto"""
         pass
 
@@ -37,12 +45,16 @@ class BaseTranslator(ABC):
         """Gera chave para cache"""
         return f"{source_lang or 'auto'}_{self.target_language}_{text}"
 
-    def _get_cached(self, text: str, source_language: Optional[str]) -> Optional[TranslationResult]:
+    def _get_cached(
+        self, text: str, source_language: Optional[str]
+    ) -> Optional[TranslationResult]:
         """Obtém tradução do cache"""
         key = self._get_cache_key(text, source_language)
         return self.cache.get(key)
 
-    def _cache_result(self, text: str, source_language: Optional[str], result: TranslationResult) -> None:
+    def _cache_result(
+        self, text: str, source_language: Optional[str], result: TranslationResult
+    ) -> None:
         """Armazena resultado no cache"""
         key = self._get_cache_key(text, source_language)
         self.cache[key] = result
@@ -60,6 +72,7 @@ class GoogleTranslator(BaseTranslator):
         """Inicializa o tradutor Google"""
         try:
             from googletrans import Translator
+
             self.translator = Translator()
             logger.info("Google Translator inicializado")
         except ImportError:
@@ -69,7 +82,9 @@ class GoogleTranslator(BaseTranslator):
             logger.error(f"Erro ao inicializar Google Translator: {e}")
             raise
 
-    def translate(self, text: str, source_language: Optional[str] = None) -> Optional[TranslationResult]:
+    def translate(
+        self, text: str, source_language: Optional[str] = None
+    ) -> Optional[TranslationResult]:
         """
         Traduz texto usando Google Translate.
 
@@ -94,15 +109,13 @@ class GoogleTranslator(BaseTranslator):
 
         try:
             result = self.translator.translate(
-                text,
-                dest=self.target_language,
-                src=source_language or 'auto'
+                text, dest=self.target_language, src=source_language or "auto"
             )
 
             translation_result = TranslationResult(
                 translated_text=result.text,
                 source_language=result.src,
-                target_language=self.target_language
+                target_language=self.target_language,
             )
 
             # Cache resultado
@@ -118,7 +131,11 @@ class GoogleTranslator(BaseTranslator):
 class LocalTranslator(BaseTranslator):
     """Tradutor local usando transformers"""
 
-    def __init__(self, target_language: str = "pt", model_name: str = "Helsinki-NLP/opus-mt-en-pt"):
+    def __init__(
+        self,
+        target_language: str = "pt",
+        model_name: str = "Helsinki-NLP/opus-mt-en-pt",
+    ):
         super().__init__(target_language)
         self.model_name = model_name
         self.tokenizer = None
@@ -142,7 +159,9 @@ class LocalTranslator(BaseTranslator):
             logger.error(f"Erro ao carregar modelo local: {e}")
             raise
 
-    def translate(self, text: str, source_language: Optional[str] = None) -> Optional[TranslationResult]:
+    def translate(
+        self, text: str, source_language: Optional[str] = None
+    ) -> Optional[TranslationResult]:
         """
         Traduz texto usando modelo local.
 
@@ -167,7 +186,7 @@ class LocalTranslator(BaseTranslator):
 
         try:
             # Tokeniza
-            inputs = self.tokenizer(text, return_tensors='pt', padding=True)
+            inputs = self.tokenizer(text, return_tensors="pt", padding=True)
 
             # Gera tradução
             tokens = self.model.generate(**inputs)
@@ -178,7 +197,7 @@ class LocalTranslator(BaseTranslator):
             translation_result = TranslationResult(
                 translated_text=translated,
                 source_language="en",  # Modelo específico en->pt
-                target_language=self.target_language
+                target_language=self.target_language,
             )
 
             # Cache resultado
@@ -235,7 +254,9 @@ class TranslationManager:
         except Exception as e:
             logger.error(f"Erro ao configurar tradutores: {e}")
 
-    def translate(self, text: str, source_language: Optional[str] = None) -> Optional[TranslationResult]:
+    def translate(
+        self, text: str, source_language: Optional[str] = None
+    ) -> Optional[TranslationResult]:
         """
         Traduz texto usando tradutor disponível.
 
@@ -277,10 +298,14 @@ class TranslationManager:
 
     def is_available(self) -> bool:
         """Verifica se pelo menos um tradutor está disponível"""
-        return self.primary_translator is not None or self.fallback_translator is not None
+        return (
+            self.primary_translator is not None or self.fallback_translator is not None
+        )
 
 
-def create_translation_manager(mode: str = "local", target_language: str = "pt") -> TranslationManager:
+def create_translation_manager(
+    mode: str = "local", target_language: str = "pt"
+) -> TranslationManager:
     """
     Factory function para criar gerenciador de tradução.
 

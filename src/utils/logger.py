@@ -1,6 +1,7 @@
 """
 Logging configuration and utilities
 """
+
 import logging
 import sys
 from typing import Optional
@@ -20,9 +21,7 @@ def setup_logging(level: str = "INFO", format_string: Optional[str] = None) -> N
     logging.basicConfig(
         level=getattr(logging, level.upper()),
         format=format_string,
-        handlers=[
-            logging.StreamHandler(sys.stdout)
-        ]
+        handlers=[logging.StreamHandler(sys.stdout)],
     )
 
 
@@ -43,16 +42,16 @@ class ColoredFormatter(logging.Formatter):
     """Formatter que adiciona cores aos logs"""
 
     COLORS = {
-        'DEBUG': '\033[36m',    # Cyan
-        'INFO': '\033[32m',     # Green
-        'WARNING': '\033[33m',  # Yellow
-        'ERROR': '\033[31m',    # Red
-        'CRITICAL': '\033[35m', # Magenta
-        'RESET': '\033[0m'      # Reset
+        "DEBUG": "\033[36m",  # Cyan
+        "INFO": "\033[32m",  # Green
+        "WARNING": "\033[33m",  # Yellow
+        "ERROR": "\033[31m",  # Red
+        "CRITICAL": "\033[35m",  # Magenta
+        "RESET": "\033[0m",  # Reset
     }
 
     def format(self, record):
-        log_color = self.COLORS.get(record.levelname, self.COLORS['RESET'])
+        log_color = self.COLORS.get(record.levelname, self.COLORS["RESET"])
         record.levelname = f"{log_color}{record.levelname}{self.COLORS['RESET']}"
         return super().format(record)
 
@@ -68,7 +67,7 @@ def setup_colored_logging(level: str = "INFO") -> None:
 
     # Adiciona handler colorido
     handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(ColoredFormatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    ))
+    handler.setFormatter(
+        ColoredFormatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    )
     logger.addHandler(handler)

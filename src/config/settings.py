@@ -1,13 +1,15 @@
 """
 Configuration management and settings
 """
-import os
+
 import json
-import yaml
-from typing import Dict, Any, Optional
-from dataclasses import dataclass, asdict
-from pathlib import Path
 import logging
+import os
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import Any, Dict, Optional
+
+import yaml
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +17,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class AudioConfig:
     """Configurações de áudio"""
+
     sample_rate: int = 16000
     channels: int = 1
     chunk_seconds: int = 3
@@ -31,6 +34,7 @@ class AudioConfig:
 @dataclass
 class TranscriptionConfig:
     """Configurações de transcrição"""
+
     model_name: str = "base"
     device: str = "cpu"
     compute_type: str = "int8"
@@ -42,6 +46,7 @@ class TranscriptionConfig:
 @dataclass
 class TranslationConfig:
     """Configurações de tradução"""
+
     enabled: bool = True
     mode: str = "local"  # "local" ou "google"
     target_language: str = "pt"
@@ -51,6 +56,7 @@ class TranslationConfig:
 @dataclass
 class UIConfig:
     """Configurações de interface"""
+
     log_level: str = "INFO"
     colored_logs: bool = True
     interactive_mode: bool = True
@@ -94,7 +100,7 @@ class ConfigManager:
             return
 
         try:
-            with open(self.config_file, 'r', encoding='utf-8') as f:
+            with open(self.config_file, "r", encoding="utf-8") as f:
                 data = yaml.safe_load(f)
 
             if data:
@@ -110,13 +116,13 @@ class ConfigManager:
         """Salva configurações no arquivo"""
         try:
             data = {
-                'audio': asdict(self.config.audio),
-                'transcription': asdict(self.config.transcription),
-                'translation': asdict(self.config.translation),
-                'ui': asdict(self.config.ui)
+                "audio": asdict(self.config.audio),
+                "transcription": asdict(self.config.transcription),
+                "translation": asdict(self.config.translation),
+                "ui": asdict(self.config.ui),
             }
 
-            with open(self.config_file, 'w', encoding='utf-8') as f:
+            with open(self.config_file, "w", encoding="utf-8") as f:
                 yaml.dump(data, f, default_flow_style=False, allow_unicode=True)
 
             logger.info(f"Configurações salvas em {self.config_file}")
@@ -127,23 +133,23 @@ class ConfigManager:
     def _update_config_from_dict(self, data: Dict[str, Any]) -> None:
         """Atualiza configuração a partir de dicionário"""
         try:
-            if 'audio' in data:
-                for key, value in data['audio'].items():
+            if "audio" in data:
+                for key, value in data["audio"].items():
                     if hasattr(self.config.audio, key):
                         setattr(self.config.audio, key, value)
 
-            if 'transcription' in data:
-                for key, value in data['transcription'].items():
+            if "transcription" in data:
+                for key, value in data["transcription"].items():
                     if hasattr(self.config.transcription, key):
                         setattr(self.config.transcription, key, value)
 
-            if 'translation' in data:
-                for key, value in data['translation'].items():
+            if "translation" in data:
+                for key, value in data["translation"].items():
                     if hasattr(self.config.translation, key):
                         setattr(self.config.translation, key, value)
 
-            if 'ui' in data:
-                for key, value in data['ui'].items():
+            if "ui" in data:
+                for key, value in data["ui"].items():
                     if hasattr(self.config.ui, key):
                         setattr(self.config.ui, key, value)
 

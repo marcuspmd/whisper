@@ -1,27 +1,32 @@
 """
 Interface interativa com rich para visualização em tempo real.
 """
+
+import logging
 import threading
 import time
-from typing import Optional, List, Dict, Any
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-import logging
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
+
 
 @dataclass
 class TranscriptionEntry:
     """Entrada de transcrição com metadados."""
+
     timestamp: datetime
     text: str
     language: str
     confidence: float = 0.0
     translation: Optional[str] = None
 
+
 @dataclass
 class AppStats:
     """Estatísticas da aplicação."""
+
     start_time: datetime = field(default_factory=datetime.now)
     total_transcriptions: int = 0
     languages_detected: Dict[str, int] = field(default_factory=dict)
@@ -30,17 +35,19 @@ class AppStats:
     current_audio_level: float = 0.0
     processing_time_avg: float = 0.0
 
+
 try:
-    from rich.console import Console
-    from rich.layout import Layout
-    from rich.panel import Panel
-    from rich.table import Table
-    from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn
-    from rich.text import Text
+    from rich import box
     from rich.align import Align
     from rich.columns import Columns
+    from rich.console import Console
+    from rich.layout import Layout
     from rich.live import Live
-    from rich import box
+    from rich.panel import Panel
+    from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn
+    from rich.table import Table
+    from rich.text import Text
+
     RICH_AVAILABLE = True
 
     class InteractiveConsole:
@@ -111,7 +118,7 @@ try:
                 console=self.console,
                 screen=True,
                 redirect_stderr=True,
-                redirect_stdout=True
+                redirect_stdout=True,
             )
 
             try:
@@ -129,7 +136,13 @@ try:
             if self.update_thread:
                 self.update_thread.join(timeout=1.0)
 
-        def add_transcription(self, text: str, language: str, confidence: float = 0.0, translation: str = None):
+        def add_transcription(
+            self,
+            text: str,
+            language: str,
+            confidence: float = 0.0,
+            translation: str = None,
+        ):
             """Adiciona nova transcrição."""
             with self.lock:
                 entry = TranscriptionEntry(
@@ -137,7 +150,7 @@ try:
                     text=text,
                     language=language,
                     confidence=confidence,
-                    translation=translation
+                    translation=translation,
                 )
 
                 self.recent_transcriptions.append(entry)
@@ -156,8 +169,14 @@ try:
 
                 # Atualiza confiança média
                 if confidence > 0:
-                    total_confidence = (self.stats.average_confidence * (self.stats.total_transcriptions - 1) + confidence)
-                    self.stats.average_confidence = total_confidence / self.stats.total_transcriptions
+                    total_confidence = (
+                        self.stats.average_confidence
+                        * (self.stats.total_transcriptions - 1)
+                        + confidence
+                    )
+                    self.stats.average_confidence = (
+                        total_confidence / self.stats.total_transcriptions
+                    )
 
         def update_audio_level(self, level: float):
             """Atualiza nível de áudio atual."""
@@ -198,7 +217,7 @@ try:
             uptime = datetime.now() - self.stats.start_time
             header_text = Text.assemble(
                 ("🎙️ Whisper Transcriber", "bold green"),
-                f" • Ativo há {str(uptime).split('.')[0]}"
+                f" • Ativo há {str(uptime).split('.')[0]}",
             )
             self.layout["header"].update(
                 Panel(Align.center(header_text), box=box.ROUNDED)
@@ -221,7 +240,7 @@ try:
                 ("Ctrl+C", "bold red"),
                 " para sair • ",
                 ("Transcrições: ", ""),
-                (str(self.stats.total_transcriptions), "bold cyan")
+                (str(self.stats.total_transcriptions), "bold cyan"),
             )
             self.layout["footer"].update(
                 Panel(Align.center(footer_text), box=box.ROUNDED)
@@ -238,14 +257,20 @@ try:
                     lang_flag = self._get_language_flag(entry.language)
 
                     # Linha principal
-                    confidence_color = "green" if entry.confidence > 0.8 else "yellow" if entry.confidence > 0.5 else "red"
-                    confidence_str = f"({entry.confidence:.1f})" if entry.confidence > 0 else ""
+                    confidence_color = (
+                        "green"
+                        if entry.confidence > 0.8
+                        else "yellow" if entry.confidence > 0.5 else "red"
+                    )
+                    confidence_str = (
+                        f"({entry.confidence:.1f})" if entry.confidence > 0 else ""
+                    )
 
                     line = Text.assemble(
                         (f"[{time_str}] ", "dim"),
                         (lang_flag, ""),
                         (f" {entry.text}", "white"),
-                        (f" {confidence_str}", confidence_color)
+                        (f" {confidence_str}", confidence_color),
                     )
                     lines.append(line)
 
@@ -254,7 +279,7 @@ try:
                         translation_line = Text.assemble(
                             ("         ", ""),
                             ("🔄 ", "blue"),
-                            (entry.translation, "cyan")
+                            (entry.translation, "cyan"),
                         )
                         lines.append(translation_line)
 
@@ -266,7 +291,7 @@ try:
                 content,
                 title="📝 Transcrições Recentes",
                 border_style="blue",
-                box=box.ROUNDED
+                box=box.ROUNDED,
             )
 
         def _render_audio_status(self) -> Panel:
@@ -291,14 +316,17 @@ try:
                 (f" {level:.1%}", "white"),
                 ("\n\n", ""),
                 ("Status: ", "white"),
-                ("🟢 Ativo" if self.running else "🔴 Parado", "green" if self.running else "red")
+                (
+                    "🟢 Ativo" if self.running else "🔴 Parado",
+                    "green" if self.running else "red",
+                ),
             )
 
             return Panel(
                 content,
                 title="🔊 Status de Áudio",
                 border_style="green",
-                box=box.ROUNDED
+                box=box.ROUNDED,
             )
 
         def _render_config(self) -> Panel:
@@ -315,14 +343,11 @@ try:
             table.add_row("Taxa:", f"{audio_cfg.sample_rate}Hz")
             table.add_row("Chunk:", f"{audio_cfg.chunk_seconds}s")
 
-            if hasattr(trans_cfg, 'language') and trans_cfg.language:
+            if hasattr(trans_cfg, "language") and trans_cfg.language:
                 table.add_row("Idioma:", trans_cfg.language)
 
             return Panel(
-                table,
-                title="⚙️ Configurações",
-                border_style="yellow",
-                box=box.ROUNDED
+                table, title="⚙️ Configurações", border_style="yellow", box=box.ROUNDED
             )
 
         def _render_stats(self) -> Panel:
@@ -340,49 +365,87 @@ try:
 
             # Idiomas mais detectados
             if self.stats.languages_detected:
-                top_lang = max(self.stats.languages_detected.items(), key=lambda x: x[1])
+                top_lang = max(
+                    self.stats.languages_detected.items(), key=lambda x: x[1]
+                )
                 flag = self._get_language_flag(top_lang[0])
                 table.add_row("Top idioma:", f"{flag} {top_lang[1]}x")
 
             return Panel(
-                table,
-                title="📊 Estatísticas",
-                border_style="magenta",
-                box=box.ROUNDED
+                table, title="📊 Estatísticas", border_style="magenta", box=box.ROUNDED
             )
 
         def _get_language_flag(self, lang_code: str) -> str:
             """Retorna emoji da bandeira para o idioma."""
             flags = {
-                'pt': '🇧🇷', 'en': '🇺🇸', 'es': '🇪🇸', 'fr': '🇫🇷',
-                'de': '🇩🇪', 'it': '🇮🇹', 'ja': '🇯🇵', 'ko': '🇰🇷',
-                'zh': '🇨🇳', 'ru': '🇷🇺', 'ar': '🇸🇦', 'hi': '🇮🇳',
-                'nl': '🇳🇱', 'sv': '🇸🇪', 'no': '🇳🇴', 'da': '🇩🇰',
-                'fi': '🇫🇮', 'pl': '🇵🇱', 'tr': '🇹🇷', 'bg': '🇧🇬',
-                'nn': '🇳🇴'
+                "pt": "🇧🇷",
+                "en": "🇺🇸",
+                "es": "🇪🇸",
+                "fr": "🇫🇷",
+                "de": "🇩🇪",
+                "it": "🇮🇹",
+                "ja": "🇯🇵",
+                "ko": "🇰🇷",
+                "zh": "🇨🇳",
+                "ru": "🇷🇺",
+                "ar": "🇸🇦",
+                "hi": "🇮🇳",
+                "nl": "🇳🇱",
+                "sv": "🇸🇪",
+                "no": "🇳🇴",
+                "da": "🇩🇰",
+                "fi": "🇫🇮",
+                "pl": "🇵🇱",
+                "tr": "🇹🇷",
+                "bg": "🇧🇬",
+                "nn": "🇳🇴",
             }
-            return flags.get(lang_code, '🌐')
+            return flags.get(lang_code, "🌐")
 
 except ImportError:
     RICH_AVAILABLE = False
 
     class InteractiveConsole:
         """Fallback para quando rich não está disponível."""
+
         def __init__(self, config):
             from .simple import SimpleConsole
+
             self.console = SimpleConsole(config)
 
         def start(self):
             return self.console.start()
+
         def stop(self):
             return self.console.stop()
-        def add_transcription(self, text: str, language: str, confidence: float = 0.0, translation: str = None):
-            return self.console.add_transcription(text, language, confidence, translation)
+
+        def add_transcription(
+            self,
+            text: str,
+            language: str,
+            confidence: float = 0.0,
+            translation: str = None,
+        ):
+            return self.console.add_transcription(
+                text, language, confidence, translation
+            )
+
         def update_audio_level(self, level: float):
             return self.console.update_audio_level(level)
+
         def update_last_translation(self, translation: str):
-            return self.console.update_last_translation(translation) if hasattr(self.console, 'update_last_translation') else None
+            return (
+                self.console.update_last_translation(translation)
+                if hasattr(self.console, "update_last_translation")
+                else None
+            )
+
         def set_audio_device(self, device_name: str):
-            return self.console.set_audio_device(device_name) if hasattr(self.console, 'set_audio_device') else None
+            return (
+                self.console.set_audio_device(device_name)
+                if hasattr(self.console, "set_audio_device")
+                else None
+            )
+
         def show_status(self, message: str):
             return self.console.show_status(message)

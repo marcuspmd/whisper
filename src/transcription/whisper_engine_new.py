@@ -1,14 +1,16 @@
 """
 Whisper transcription engine
 """
+
+import logging
 import os
 import tempfile
+from collections import deque
+from typing import List, Optional
+
 import numpy as np
 import soundfile as sf
 from faster_whisper import WhisperModel
-from typing import Optional, List
-from collections import deque
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +18,12 @@ logger = logging.getLogger(__name__)
 class TranscriptionResult:
     """Resultado de transcrição"""
 
-    def __init__(self, text: str, language: Optional[str] = None, confidence: Optional[float] = None):
+    def __init__(
+        self,
+        text: str,
+        language: Optional[str] = None,
+        confidence: Optional[float] = None,
+    ):
         self.text = text
         self.language = language
         self.confidence = confidence
@@ -37,7 +44,7 @@ class WhisperTranscriber:
         model_name: str = "base",
         device: str = "cpu",
         compute_type: str = "int8",
-        language: Optional[str] = None
+        language: Optional[str] = None,
     ):
         self.model_name = model_name
         self.device = device
@@ -53,16 +60,16 @@ class WhisperTranscriber:
         try:
             logger.info(f"Carregando modelo Whisper: {self.model_name}")
             self.model = WhisperModel(
-                self.model_name,
-                device=self.device,
-                compute_type=self.compute_type
+                self.model_name, device=self.device, compute_type=self.compute_type
             )
             logger.info("Modelo carregado com sucesso")
         except Exception as e:
             logger.error(f"Erro ao carregar modelo: {e}")
             raise
 
-    def transcribe_audio(self, audio_data: np.ndarray, sample_rate: int) -> Optional[TranscriptionResult]:
+    def transcribe_audio(
+        self, audio_data: np.ndarray, sample_rate: int
+    ) -> Optional[TranscriptionResult]:
         """
         Transcreve áudio.
 
@@ -83,27 +90,27 @@ class WhisperTranscriber:
         # Salva áudio temporário
         temp_path = None
         try:
-            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp:
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
                 temp_path = tmp.name
-                sf.write(temp_path, audio_data, sample_rate, subtype='PCM_16')
+                sf.write(temp_path, audio_data, sample_rate, subtype="PCM_16")
 
             # Parâmetros de transcrição otimizados para tempo real
             transcribe_params = {
                 "beam_size": 1,
                 "best_of": 1,
                 "temperature": 0.0,
-                "condition_on_previous_text": False
+                "condition_on_previous_text": False,
             }
 
             if self.language:
-                transcribe_params['language'] = self.language
+                transcribe_params["language"] = self.language
 
             # Transcreve
             segments, info = self.model.transcribe(temp_path, **transcribe_params)
 
             # Processa segmentos
             for segment in segments:
-                text = getattr(segment, 'text', '').strip()
+                text = getattr(segment, "text", "").strip()
                 if not text:
                     continue
 
@@ -115,8 +122,8 @@ class WhisperTranscriber:
 
                 return TranscriptionResult(
                     text=text,
-                    language=getattr(info, 'language', None),
-                    confidence=getattr(segment, 'avg_logprob', None)
+                    language=getattr(info, "language", None),
+                    confidence=getattr(segment, "avg_logprob", None),
                 )
 
             return None
@@ -141,19 +148,31 @@ class WhisperTranscriber:
     def get_supported_languages(self) -> List[str]:
         """Retorna lista de idiomas suportados"""
         return [
-            'en', 'pt', 'es', 'fr', 'de', 'it', 'ja', 'ko', 'zh', 'ru',
-            'ar', 'tr', 'pl', 'nl', 'sv', 'da', 'no', 'fi', 'cs', 'sk'
+            "en",
+            "pt",
+            "es",
+            "fr",
+            "de",
+            "it",
+            "ja",
+            "ko",
+            "zh",
+            "ru",
+            "ar",
+            "tr",
+            "pl",
+            "nl",
+            "sv",
+            "da",
+            "no",
+            "fi",
+            "cs",
+            "sk",
         ]
 
 
 def create_transcriber(
-    model_name: str = "base",
-    device: str = "cpu",
-    language: Optional[str] = None
+    model_name: str = "base", device: str = "cpu", language: Optional[str] = None
 ) -> WhisperTranscriber:
     """Factory function para criar transcriber"""
-    return WhisperTranscriber(
-        model_name=model_name,
-        device=device,
-        language=language
-    )
+    return WhisperTranscriber(model_name=model_name, device=device, language=language)

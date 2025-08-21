@@ -1,18 +1,20 @@
 """
 Main application orchestrator
 """
-import os
-import sys
-import signal
-import threading
-import multiprocessing as mp
-import time
-import numpy as np
-from typing import Optional
-import logging
 
+import logging
+import multiprocessing as mp
+import os
+import signal
+import sys
+import threading
+import time
 # Suprimir warnings do pkg_resources
 import warnings
+from typing import Optional
+
+import numpy as np
+
 with warnings.catch_warnings():
     warnings.filterwarnings(
         "ignore",
@@ -20,11 +22,11 @@ with warnings.catch_warnings():
         category=UserWarning,
     )
 
-from .audio.device_manager import AudioDeviceManager
 from .audio.capture import AudioCapture, VADAudioCapture
+from .audio.device_manager import AudioDeviceManager
+from .config.settings import get_config_manager
 from .transcription.whisper_engine import WhisperTranscriber
 from .translation.engines import TranslationManager
-from .config.settings import get_config_manager
 from .ui.simple import create_interactive_console
 from .utils.logger import setup_colored_logging
 
@@ -80,9 +82,7 @@ class WhisperApplication:
 
         # Configura apenas logging para arquivo para evitar interferir com a interface
         file_handler = RotatingFileHandler(
-            log_file,
-            maxBytes=10*1024*1024,  # 10MB
-            backupCount=5
+            log_file, maxBytes=10 * 1024 * 1024, backupCount=5  # 10MB
         )
         file_handler.setFormatter(
             logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -112,10 +112,12 @@ class WhisperApplication:
             def force_exit():
                 logger.warning("Timeout de shutdown atingido, forçando saída...")
                 import os
+
                 os._exit(1)
 
             # Timer de 10 segundos para força exit
             import threading
+
             timer = threading.Timer(10.0, force_exit)
             timer.start()
 
@@ -137,28 +139,38 @@ class WhisperApplication:
             device_name = "Dispositivo padrão"
 
             if self.config.audio.device_id is not None:
-                device_info = self.device_manager.find_device_by_id(self.config.audio.device_id)
+                device_info = self.device_manager.find_device_by_id(
+                    self.config.audio.device_id
+                )
                 if device_info and device_info[2] > 0:  # tem entrada
                     device_index = device_info[0]
                     device_name = device_info[1]
                     logger.info(f"Usando dispositivo ID {device_index}: {device_name}")
                 else:
-                    logger.warning(f"Dispositivo ID {self.config.audio.device_id} inválido")
+                    logger.warning(
+                        f"Dispositivo ID {self.config.audio.device_id} inválido"
+                    )
 
             elif self.config.audio.device_name:
-                device_index = self.device_manager.find_input_device_by_name(self.config.audio.device_name)
+                device_index = self.device_manager.find_input_device_by_name(
+                    self.config.audio.device_name
+                )
                 if device_index is not None:
                     device_name = self.config.audio.device_name
                     logger.info(f"Usando dispositivo por nome: {device_name}")
                 else:
-                    logger.warning(f"Dispositivo '{self.config.audio.device_name}' não encontrado")
+                    logger.warning(
+                        f"Dispositivo '{self.config.audio.device_name}' não encontrado"
+                    )
 
             # Configura dispositivo padrão se encontrado
             if device_index is not None:
                 self.device_manager.set_default_device(device_index)
 
             # Cria captura de áudio
-            capture_class = VADAudioCapture if self.config.transcription.use_vad else AudioCapture
+            capture_class = (
+                VADAudioCapture if self.config.transcription.use_vad else AudioCapture
+            )
 
             if self.config.transcription.use_vad:
                 self.audio_capture = capture_class(
@@ -166,14 +178,14 @@ class WhisperApplication:
                     channels=self.config.audio.channels,
                     buffer_seconds=self.config.audio.buffer_seconds,
                     device_index=device_index,
-                    vad_aggressiveness=self.config.transcription.vad_aggressiveness
+                    vad_aggressiveness=self.config.transcription.vad_aggressiveness,
                 )
             else:
                 self.audio_capture = capture_class(
                     sample_rate=self.config.audio.sample_rate,
                     channels=self.config.audio.channels,
                     buffer_seconds=self.config.audio.buffer_seconds,
-                    device_index=device_index
+                    device_index=device_index,
                 )
 
             # Atualiza UI com nome do dispositivo
@@ -192,7 +204,7 @@ class WhisperApplication:
             self.transcriber = WhisperTranscriber(
                 model_name=self.config.transcription.model_name,
                 device=self.config.transcription.device,
-                language=self.config.transcription.language
+                language=self.config.transcription.language,
             )
 
             logger.info("Sistema de transcrição configurado")
@@ -208,11 +220,13 @@ class WhisperApplication:
             if self.config.translation.enabled:
                 self.translation_manager = TranslationManager(
                     mode=self.config.translation.mode,
-                    target_language=self.config.translation.target_language
+                    target_language=self.config.translation.target_language,
                 )
 
                 if self.translation_manager.is_available():
-                    logger.info(f"Sistema de tradução configurado: {self.config.translation.mode}")
+                    logger.info(
+                        f"Sistema de tradução configurado: {self.config.translation.mode}"
+                    )
                 else:
                     logger.warning("Nenhum tradutor disponível")
                     self.translation_manager = None
@@ -235,10 +249,12 @@ class WhisperApplication:
                 logger.info("Modo headless - sem interface terminal")
             elif not self.use_simple_ui:
                 from .ui.interactive import InteractiveConsole
+
                 self.ui = InteractiveConsole(self.config)
                 logger.info("Interface interativa configurada")
             else:
                 from .ui.simple import SimpleConsole
+
                 self.ui = SimpleConsole(self.config)
                 logger.info("Modo console simples")
 
@@ -270,7 +286,9 @@ class WhisperApplication:
                 # Se VAD está ativo, usa lógica diferente
                 if isinstance(self.audio_capture, VADAudioCapture):
                     # Obtém chunk pequeno para detecção rápida
-                    detection_chunk = self.audio_capture.get_audio_chunk(0.5)  # 500ms para detecção
+                    detection_chunk = self.audio_capture.get_audio_chunk(
+                        0.5
+                    )  # 500ms para detecção
 
                     if detection_chunk is None or len(detection_chunk) == 0:
                         time.sleep(0.1)
@@ -295,13 +313,19 @@ class WhisperApplication:
                             # Cooldown: aguarda pelo menos 1 segundo desde a última transcrição
                             if current_time - last_transcription_time >= 1.0:
                                 # Obtém chunk maior para transcrição
-                                chunk_duration = getattr(self.config.audio, 'vad_chunk_seconds', 2.5)
-                                audio_chunk = self.audio_capture.get_audio_chunk(chunk_duration)
+                                chunk_duration = getattr(
+                                    self.config.audio, "vad_chunk_seconds", 2.5
+                                )
+                                audio_chunk = self.audio_capture.get_audio_chunk(
+                                    chunk_duration
+                                )
 
                                 if audio_chunk is not None and len(audio_chunk) > 0:
                                     self._process_transcription(audio_chunk)
                                     last_transcription_time = current_time
-                                    speech_start_time = None  # Reset para próxima detecção
+                                    speech_start_time = (
+                                        None  # Reset para próxima detecção
+                                    )
                     else:
                         # Sem fala detectada
                         if speech_start_time is not None:
@@ -313,12 +337,17 @@ class WhisperApplication:
 
                 else:
                     # Lógica original para modo sem VAD
-                    if current_time - last_transcription_time < self.config.audio.chunk_seconds:
+                    if (
+                        current_time - last_transcription_time
+                        < self.config.audio.chunk_seconds
+                    ):
                         time.sleep(0.1)
                         continue
 
                     # Obtém chunk de áudio
-                    audio_chunk = self.audio_capture.get_audio_chunk(self.config.audio.chunk_seconds)
+                    audio_chunk = self.audio_capture.get_audio_chunk(
+                        self.config.audio.chunk_seconds
+                    )
 
                     if audio_chunk is None or len(audio_chunk) == 0:
                         time.sleep(0.1)
@@ -334,7 +363,9 @@ class WhisperApplication:
                         self.desktop_interface.update_audio_level(audio_level)
 
                     # Verifica se há atividade de voz
-                    if self.audio_capture.is_silent(self.config.audio.silence_threshold):
+                    if self.audio_capture.is_silent(
+                        self.config.audio.silence_threshold
+                    ):
                         continue
 
                     # Processa transcrição
@@ -349,7 +380,9 @@ class WhisperApplication:
         """Processa transcrição de áudio"""
         try:
             # Transcreve
-            result = self.transcriber.transcribe_audio(audio_data, self.config.audio.sample_rate)
+            result = self.transcriber.transcribe_audio(
+                audio_data, self.config.audio.sample_rate
+            )
 
             if result is None or not result.text.strip():
                 return
@@ -357,9 +390,11 @@ class WhisperApplication:
             original_text = result.text.strip()
 
             # Mostra resultado imediatamente (sem tradução)
-            timestamp = time.strftime('%H:%M:%S')
-            confidence = getattr(result, 'confidence', 0.0)
-            current_audio_level = self.audio_capture.get_audio_level() if self.audio_capture else 0.0
+            timestamp = time.strftime("%H:%M:%S")
+            confidence = getattr(result, "confidence", 0.0)
+            current_audio_level = (
+                self.audio_capture.get_audio_level() if self.audio_capture else 0.0
+            )
 
             # Adiciona à interface terminal se disponível
             if self.ui:
@@ -367,7 +402,7 @@ class WhisperApplication:
                     text=original_text,
                     language=result.language,
                     confidence=confidence,
-                    translation=None
+                    translation=None,
                 )
 
             # Adiciona à interface web se disponível
@@ -377,7 +412,7 @@ class WhisperApplication:
                     language=result.language,
                     confidence=confidence,
                     translation=None,
-                    audio_level=current_audio_level
+                    audio_level=current_audio_level,
                 )
 
             # Adiciona à interface desktop se disponível
@@ -387,32 +422,45 @@ class WhisperApplication:
                     language=result.language,
                     confidence=confidence,
                     translation=None,
-                    audio_level=current_audio_level
+                    audio_level=current_audio_level,
                 )
 
                 # Inicia tradução assíncrona se habilitada
                 if self.translation_manager:
+
                     def translate_async():
                         try:
-                            translation_result = self.translation_manager.translate(original_text, result.language)
+                            translation_result = self.translation_manager.translate(
+                                original_text, result.language
+                            )
                             if translation_result:
                                 # Atualiza a última transcrição com a tradução
                                 if self.ui:
-                                    self.ui.update_last_translation(translation_result.translated_text)
+                                    self.ui.update_last_translation(
+                                        translation_result.translated_text
+                                    )
                                 if self.web_interface:
-                                    self.web_interface.update_last_translation(translation_result.translated_text)
+                                    self.web_interface.update_last_translation(
+                                        translation_result.translated_text
+                                    )
                                 if self.desktop_interface:
-                                    self.desktop_interface.update_last_translation(translation_result.translated_text)
+                                    self.desktop_interface.update_last_translation(
+                                        translation_result.translated_text
+                                    )
                         except Exception as e:
                             logger.error(f"Erro na tradução assíncrona: {e}")
 
-                    translation_thread = threading.Thread(target=translate_async, daemon=True)
+                    translation_thread = threading.Thread(
+                        target=translate_async, daemon=True
+                    )
                     translation_thread.start()
             else:
                 # Modo console simples - tradução síncrona
                 translated_text = None
                 if self.translation_manager:
-                    translation_result = self.translation_manager.translate(original_text, result.language)
+                    translation_result = self.translation_manager.translate(
+                        original_text, result.language
+                    )
                     if translation_result:
                         translated_text = translation_result.translated_text
 
@@ -462,14 +510,16 @@ class WhisperApplication:
             self.ui_thread = threading.Thread(target=self.ui.start, daemon=True)
             self.ui_thread.start()
 
-        self.audio_monitor_thread = threading.Thread(target=self._audio_monitor_loop, daemon=True)
+        self.audio_monitor_thread = threading.Thread(
+            target=self._audio_monitor_loop, daemon=True
+        )
         self.audio_monitor_thread.start()
 
         logger.info("✅ Aplicação iniciada com sucesso!")
 
         if not self.ui:
             print("🎙️ Captura contínua de áudio... (Ctrl+C para parar)")
-            print("="*50)
+            print("=" * 50)
 
         return True
 

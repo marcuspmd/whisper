@@ -3,8 +3,8 @@
 Whisper Real-time Transcriber v2.0
 Transcrição e tradução de áudio em tempo real com interface interativa
 """
-import sys
 import argparse
+import sys
 from pathlib import Path
 
 # Adiciona src ao path para imports
@@ -20,7 +20,7 @@ from src.utils.logger import setup_colored_logging
 def create_parser() -> argparse.ArgumentParser:
     """Cria parser de argumentos da linha de comando"""
     parser = argparse.ArgumentParser(
-        description='Whisper Real-time Transcriber v2.0 - Transcrição e tradução em tempo real',
+        description="Whisper Real-time Transcriber v2.0 - Transcrição e tradução em tempo real",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Exemplos de uso:
@@ -29,67 +29,144 @@ Exemplos de uso:
   python main.py --model small --language pt        # Modelo small, força português
   python main.py --no-translate --simple            # Apenas transcrição, modo console simples
   python main.py --device-id 2 --translate-mode google  # Dispositivo específico, Google Translate
-        """
+        """,
     )
 
     # Dispositivos de áudio
-    audio_group = parser.add_argument_group('Configurações de Áudio')
-    audio_group.add_argument('--list-devices', action='store_true',
-                            help='Lista todos os dispositivos de áudio disponíveis e sai')
-    audio_group.add_argument('--device-id', type=int, metavar='ID',
-                            help='ID do dispositivo de entrada (use --list-devices para ver os IDs)')
-    audio_group.add_argument('--device-name', metavar='NOME',
-                            help='Substring do nome do dispositivo de entrada (ex: BlackHole)')
-    audio_group.add_argument('--sample-rate', type=int, default=16000, metavar='RATE',
-                            help='Taxa de amostragem (default: 16000)')
-    audio_group.add_argument('--chunk-seconds', type=int, default=3, metavar='SEC',
-                            help='Intervalo de processamento em segundos (default: 3)')
+    audio_group = parser.add_argument_group("Configurações de Áudio")
+    audio_group.add_argument(
+        "--list-devices",
+        action="store_true",
+        help="Lista todos os dispositivos de áudio disponíveis e sai",
+    )
+    audio_group.add_argument(
+        "--device-id",
+        type=int,
+        metavar="ID",
+        help="ID do dispositivo de entrada (use --list-devices para ver os IDs)",
+    )
+    audio_group.add_argument(
+        "--device-name",
+        metavar="NOME",
+        help="Substring do nome do dispositivo de entrada (ex: BlackHole)",
+    )
+    audio_group.add_argument(
+        "--sample-rate",
+        type=int,
+        default=16000,
+        metavar="RATE",
+        help="Taxa de amostragem (default: 16000)",
+    )
+    audio_group.add_argument(
+        "--chunk-seconds",
+        type=int,
+        default=3,
+        metavar="SEC",
+        help="Intervalo de processamento em segundos (default: 3)",
+    )
 
     # Transcrição
-    transcription_group = parser.add_argument_group('Configurações de Transcrição')
-    transcription_group.add_argument('--model', default='base', metavar='MODEL',
-                                    help='Modelo Whisper (tiny, base, small, medium, large)')
-    transcription_group.add_argument('--device', default='cpu', choices=['cpu', 'cuda'],
-                                    help='Dispositivo para processamento (cpu/cuda)')
-    transcription_group.add_argument('--language', metavar='LANG',
-                                    help='Idioma do áudio (pt, en, es, fr, etc.) - auto-detecta se não especificado')
-    transcription_group.add_argument('--use-vad', action='store_true',
-                                    help='Usar detecção de atividade de voz (requer webrtcvad)')
-    transcription_group.add_argument('--vad-aggressiveness', type=int, default=2, choices=[0,1,2,3],
-                                    help='Agressividade do VAD (0-3, default: 2)')
+    transcription_group = parser.add_argument_group("Configurações de Transcrição")
+    transcription_group.add_argument(
+        "--model",
+        default="base",
+        metavar="MODEL",
+        help="Modelo Whisper (tiny, base, small, medium, large)",
+    )
+    transcription_group.add_argument(
+        "--device",
+        default="cpu",
+        choices=["cpu", "cuda"],
+        help="Dispositivo para processamento (cpu/cuda)",
+    )
+    transcription_group.add_argument(
+        "--language",
+        metavar="LANG",
+        help="Idioma do áudio (pt, en, es, fr, etc.) - auto-detecta se não especificado",
+    )
+    transcription_group.add_argument(
+        "--use-vad",
+        action="store_true",
+        help="Usar detecção de atividade de voz (requer webrtcvad)",
+    )
+    transcription_group.add_argument(
+        "--vad-aggressiveness",
+        type=int,
+        default=2,
+        choices=[0, 1, 2, 3],
+        help="Agressividade do VAD (0-3, default: 2)",
+    )
 
     # Tradução
-    translation_group = parser.add_argument_group('Configurações de Tradução')
-    translation_group.add_argument('--no-translate', action='store_true',
-                                  help='Desabilita tradução (apenas transcrição)')
-    translation_group.add_argument('--translate-mode', default='local', choices=['local', 'google'],
-                                  help='Modo de tradução (default: local)')
-    translation_group.add_argument('--target-language', default='pt', metavar='LANG',
-                                  help='Idioma de destino para tradução (default: pt)')
+    translation_group = parser.add_argument_group("Configurações de Tradução")
+    translation_group.add_argument(
+        "--no-translate",
+        action="store_true",
+        help="Desabilita tradução (apenas transcrição)",
+    )
+    translation_group.add_argument(
+        "--translate-mode",
+        default="local",
+        choices=["local", "google"],
+        help="Modo de tradução (default: local)",
+    )
+    translation_group.add_argument(
+        "--target-language",
+        default="pt",
+        metavar="LANG",
+        help="Idioma de destino para tradução (default: pt)",
+    )
 
     # Interface
-    ui_group = parser.add_argument_group('Configurações de Interface')
-    ui_group.add_argument('--simple', action='store_true',
-                         help='Modo console simples (sem interface interativa)')
-    ui_group.add_argument('--web', action='store_true',
-                         help='Inicia interface web (acesso via navegador)')
-    ui_group.add_argument('--gui', action='store_true',
-                         help='Inicia interface desktop (aplicativo com janela)')
-    ui_group.add_argument('--web-host', default='0.0.0.0', metavar='HOST',
-                         help='Host para interface web (default: 0.0.0.0)')
-    ui_group.add_argument('--web-port', type=int, default=5000, metavar='PORT',
-                         help='Porta para interface web (default: 5000)')
-    ui_group.add_argument('--log-level', default='INFO', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
-                         help='Nível de log (default: INFO)')
-    ui_group.add_argument('--no-color', action='store_true',
-                         help='Desabilita cores nos logs')
+    ui_group = parser.add_argument_group("Configurações de Interface")
+    ui_group.add_argument(
+        "--simple",
+        action="store_true",
+        help="Modo console simples (sem interface interativa)",
+    )
+    ui_group.add_argument(
+        "--web", action="store_true", help="Inicia interface web (acesso via navegador)"
+    )
+    ui_group.add_argument(
+        "--gui",
+        action="store_true",
+        help="Inicia interface desktop (aplicativo com janela)",
+    )
+    ui_group.add_argument(
+        "--web-host",
+        default="0.0.0.0",
+        metavar="HOST",
+        help="Host para interface web (default: 0.0.0.0)",
+    )
+    ui_group.add_argument(
+        "--web-port",
+        type=int,
+        default=5000,
+        metavar="PORT",
+        help="Porta para interface web (default: 5000)",
+    )
+    ui_group.add_argument(
+        "--log-level",
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+        help="Nível de log (default: INFO)",
+    )
+    ui_group.add_argument(
+        "--no-color", action="store_true", help="Desabilita cores nos logs"
+    )
 
     # Configuração
-    config_group = parser.add_argument_group('Gerenciamento de Configuração')
-    config_group.add_argument('--save-config', action='store_true',
-                             help='Salva configurações atuais como padrão')
-    config_group.add_argument('--reset-config', action='store_true',
-                             help='Reseta configurações para padrões de fábrica')
+    config_group = parser.add_argument_group("Gerenciamento de Configuração")
+    config_group.add_argument(
+        "--save-config",
+        action="store_true",
+        help="Salva configurações atuais como padrão",
+    )
+    config_group.add_argument(
+        "--reset-config",
+        action="store_true",
+        help="Reseta configurações para padrões de fábrica",
+    )
 
     return parser
 
@@ -157,9 +234,12 @@ def main():
     # Reset de configuração se solicitado
     if args.reset_config:
         import shutil
+
         if config_manager.config_file.exists():
-            shutil.move(str(config_manager.config_file),
-                       str(config_manager.config_file.with_suffix('.bak')))
+            shutil.move(
+                str(config_manager.config_file),
+                str(config_manager.config_file.with_suffix(".bak")),
+            )
         print("✅ Configurações resetadas para padrões de fábrica")
         config_manager = get_config_manager()  # Recarrega configurações padrão
 
@@ -177,8 +257,9 @@ def main():
         # Verifica modo de interface
         if args.gui:
             # Modo interface desktop
-            from src.ui.desktop import DesktopInterface
             import threading
+
+            from src.ui.desktop import DesktopInterface
 
             print("🖥️ Iniciando interface desktop...")
 
@@ -197,10 +278,13 @@ def main():
 
         elif args.web:
             # Modo interface web
-            from src.ui.web import WebInterface
             import threading
 
-            print(f"🌐 Iniciando interface web em http://{args.web_host}:{args.web_port}")
+            from src.ui.web import WebInterface
+
+            print(
+                f"🌐 Iniciando interface web em http://{args.web_host}:{args.web_port}"
+            )
             print("   Pressione Ctrl+C para parar")
 
             # Cria aplicação em modo headless (sem interface terminal)
@@ -217,7 +301,9 @@ def main():
             try:
                 web_interface.set_on_shutdown(app.stop)
                 token = web_interface.get_shutdown_token()
-                print(f"🔐 Shutdown token: {token} (use POST /api/shutdown para encerrar)")
+                print(
+                    f"🔐 Shutdown token: {token} (use POST /api/shutdown para encerrar)"
+                )
             except Exception:
                 pass
 
@@ -242,12 +328,13 @@ def main():
                     print(f"Erro durante app.stop(): {e}")
 
                 # Se o app foi executado em thread, aguarda terminar
-                if 'app_thread' in locals() and app_thread.is_alive():
+                if "app_thread" in locals() and app_thread.is_alive():
                     print("⏳ Aguardando threads finalizarem...")
                     app_thread.join(timeout=5)
                     if app_thread.is_alive():
                         print("⚠️ Thread não finalizou, forçando saída...")
                         import os
+
                         os._exit(1)
 
                 print("✅ Shutdown completo")
@@ -269,5 +356,5 @@ def main():
         return 1
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

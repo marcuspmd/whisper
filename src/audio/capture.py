@@ -1,14 +1,16 @@
 """
 Audio capture module
 """
-import numpy as np
-import sounddevice as sd
-import threading
+
+import logging
 import queue
+import threading
 import time
 from collections import deque
-from typing import Callable, Optional, Any
-import logging
+from typing import Any, Callable, Optional
+
+import numpy as np
+import sounddevice as sd
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +59,7 @@ class AudioCapture:
         channels: int = 1,
         buffer_seconds: int = 15,
         device_index: Optional[int] = None,
-        callback: Optional[Callable[[np.ndarray], None]] = None
+        callback: Optional[Callable[[np.ndarray], None]] = None,
     ):
         self.sample_rate = sample_rate
         self.channels = channels
@@ -74,7 +76,9 @@ class AudioCapture:
         self.audio_level = 0.0
         self._level_lock = threading.Lock()
 
-    def _audio_callback(self, indata: np.ndarray, frames: int, time_info: Any, status: sd.CallbackFlags) -> None:
+    def _audio_callback(
+        self, indata: np.ndarray, frames: int, time_info: Any, status: sd.CallbackFlags
+    ) -> None:
         """Callback chamado pelo sounddevice"""
         try:
             if status:
@@ -99,7 +103,9 @@ class AudioCapture:
                 raw_audio_normalized = raw_audio
 
             # Normalização mais suave para evitar "explosão"
-            audio_data = (raw_audio_normalized * 32767 * 0.8).astype(np.int16)  # 80% do range para margem
+            audio_data = (raw_audio_normalized * 32767 * 0.8).astype(
+                np.int16
+            )  # 80% do range para margem
 
             # Adiciona ao buffer
             self.buffer.add_samples(audio_data)
@@ -107,9 +113,11 @@ class AudioCapture:
             # Atualiza nível de áudio de forma thread-safe
             with self._level_lock:
                 # Calcula RMS dos dados normalizados (-1 a 1)
-                rms = np.sqrt(np.mean(raw_audio_normalized ** 2))
+                rms = np.sqrt(np.mean(raw_audio_normalized**2))
                 # Normaliza para 0-1 com multiplicador adequado para voz humana
-                self.audio_level = min(1.0, rms * 15)  # Ajustado para sensibilidade adequada
+                self.audio_level = min(
+                    1.0, rms * 15
+                )  # Ajustado para sensibilidade adequada
 
             # Chama callback externo se definido
             if self.callback:
@@ -137,17 +145,19 @@ class AudioCapture:
                 callback=self._audio_callback,
                 channels=self.channels,
                 samplerate=self.sample_rate,
-                dtype='int16',
+                dtype="int16",
                 device=self.device_index,
                 blocksize=self.block_size,
-                latency='low'
+                latency="low",
             )
 
             self.stream.start()
             self.is_recording = True
             self.stop_flag.clear()
 
-            logger.info(f"Captura iniciada - dispositivo: {self.device_index or 'padrão'}")
+            logger.info(
+                f"Captura iniciada - dispositivo: {self.device_index or 'padrão'}"
+            )
             return True
 
         except Exception as e:
@@ -240,6 +250,7 @@ class VADAudioCapture(AudioCapture):
         # Tenta carregar webrtcvad
         try:
             import webrtcvad
+
             self.vad = webrtcvad.Vad(vad_aggressiveness)
             logger.info(f"VAD carregado com agressividade {vad_aggressiveness}")
         except ImportError:
@@ -282,7 +293,7 @@ class VADAudioCapture(AudioCapture):
 
         # Divide o áudio em frames sequenciais (sem overlap)
         for i in range(0, len(audio_data) - frame_len + 1, frame_len):
-            frame = audio_data[i:i + frame_len]
+            frame = audio_data[i : i + frame_len]
             if len(frame) < frame_len:
                 continue
 
@@ -306,10 +317,10 @@ class VADAudioCapture(AudioCapture):
 
         # Limiares de speech_ratio baseados na agressividade
         ratio_thresholds = {
-            0: 0.6,   # 60% dos frames devem ter fala (muito conservador)
-            1: 0.4,   # 40% dos frames devem ter fala (conservador)
+            0: 0.6,  # 60% dos frames devem ter fala (muito conservador)
+            1: 0.4,  # 40% dos frames devem ter fala (conservador)
             2: 0.25,  # 25% dos frames devem ter fala (moderado)
-            3: 0.15   # 15% dos frames devem ter fala (agressivo)
+            3: 0.15,  # 15% dos frames devem ter fala (agressivo)
         }
 
         threshold = ratio_thresholds.get(self.vad_aggressiveness, 0.25)
