@@ -826,13 +826,34 @@ class DesktopInterface:
             lines = content.split('\n')
 
             # Encontrar última entrada e adicionar tradução
+            last_text = None
             for i in range(len(lines) - 1, -1, -1):
                 if lines[i].startswith('[') and ']' in lines[i]:
-                    # Inserir tradução após a linha encontrada
+                    # Extrair texto da transcrição para o teleprompter
+                    line = lines[i]
+                    if ') ' in line:
+                        last_text = line.split(') ', 1)[1]
+
+                    # Inserir tradução na interface principal
                     insert_pos = f"{i+2}.0"
                     self.transcriptions_text.insert(insert_pos, f"    → {translation}\n")
                     self.transcriptions_text.see(tk.END)
                     break
+
+            # Atualizar teleprompter com tradução
+            if last_text and self.teleprompter_text_widget:
+                try:
+                    from datetime import datetime
+                    timestamp = datetime.now().strftime("%H:%M:%S")
+
+                    # Adicionar apenas a tradução ao teleprompter
+                    teleprompter_entry = f"    → {translation}\n\n"
+                    self.teleprompter_text_widget.insert(tk.END, teleprompter_entry)
+                    self.teleprompter_text_widget.see(tk.END)
+                except tk.TclError:
+                    # Janela foi fechada
+                    self.teleprompter_window = None
+                    self.teleprompter_text_widget = None
 
             self.current_stats['translation_count'] += 1
 
@@ -898,115 +919,77 @@ class TeleprompterWindow:
         self.parent.teleprompter_text_widget = self.text_widget
 
     def _create_window(self):
-        """Cria a janela principal do teleprompter."""
+        """Cria a janela principal do teleprompter com transparência controlada."""
         self.root = tk.Toplevel(self.parent.root)
-        self.root.title("Teleprompter - Whisper")
-        self.root.geometry("800x600")
+        self.root.title("📺 Teleprompter - Whisper")
+        self.root.geometry("800x600+100+100")
 
-        # Remover decorações da janela
-        self.root.overrideredirect(False)  # Manter borda para facilitar manipulação
-
-        # Configurar topmost
-        self.root.attributes("-topmost", True)
-
-        # NUNCA aplicar transparência à janela principal - manter totalmente opaca
-        self.root.wm_attributes("-alpha", 1.0)
-
-        # Criar estrutura de fundo personalizada
+        # Manter decorações da janela para facilitar movimento
+        self.root.overrideredirect(False)
+        
+        # Configurar atributos da janela
+        self.root.wm_attributes("-topmost", True)
+        
+        # Aplicar transparência inicial de forma controlada
+        self.root.wm_attributes("-alpha", 0.95)  # Ligeiramente transparente, mas controles visíveis
+        
+        # Configurar cor de fundo
+        self.root.configure(bg=self.bg_color)
+        
+        # Configurar estrutura de transparência
         self._setup_transparent_background()
 
         # Configurar fechamento
         self.root.protocol("WM_DELETE_WINDOW", self.close)
 
     def _setup_transparent_background(self):
-        """Configura o fundo transparente mantendo o texto opaco."""
-        # IMPORTANTE: Janela principal sempre 100% opaca
-        self.root.wm_attributes("-alpha", 1.0)
-
-        # Criar canvas de fundo para efeitos visuais
-        self.bg_canvas = tk.Canvas(
-            self.root,
-            highlightthickness=0,
-            borderwidth=0
-        )
-        self.bg_canvas.pack(fill="both", expand=True)
-
-        # Frame principal sobre o canvas
-        self.bg_frame = tk.Frame(self.bg_canvas)
-
-        # Posicionar frame no canvas
-        self.canvas_frame = self.bg_canvas.create_window(
-            0, 0,
-            anchor="nw",
-            window=self.bg_frame
-        )
-
-        # Configurar redimensionamento
-        self.bg_canvas.bind('<Configure>', self._on_canvas_configure)
-        self.bg_frame.bind('<Configure>', self._on_frame_configure)
-
+        """Configura o fundo com transparência controlada."""
+        # Container principal - sem transparência para manter controles visíveis
+        self.main_container = tk.Frame(self.root, bg=self.bg_color)
+        self.main_container.pack(fill="both", expand=True, padx=5, pady=5)
+        
         # Configurar cor inicial
         self.current_bg = self.bg_color
-        self._update_canvas_background()
-
-    def _on_canvas_configure(self, event):
-        """Ajusta o frame quando canvas redimensiona."""
-        canvas_width = event.width
-        canvas_height = event.height
-        self.bg_canvas.itemconfig(self.canvas_frame, width=canvas_width, height=canvas_height)
-
-    def _on_frame_configure(self, event):
-        """Atualiza scroll region do canvas."""
-        self.bg_canvas.configure(scrollregion=self.bg_canvas.bbox("all"))
-
-    def _update_canvas_background(self):
-        """Atualiza cor de fundo do canvas."""
-        self.bg_canvas.configure(bg=self.current_bg)
-        self.bg_frame.configure(bg=self.current_bg)
 
     def _update_transparency(self):
-        """Atualiza a transparência apenas do fundo, mantendo texto opaco."""
-        # NUNCA aplicar transparência à janela - apenas mudar cores de fundo
-        # para simular efeito de transparência visual
-
-        # Mapear transparência para intensidade de cor
-        if self.transparency < 0.3:
-            # Muito transparente: cor muito escura
-            intensity = 15
-        elif self.transparency < 0.5:
-            # Transparente: cor escura
-            intensity = 30
-        elif self.transparency < 0.7:
-            # Médio: cor média
-            intensity = 60
-        elif self.transparency < 0.9:
-            # Pouco transparente: cor clara
-            intensity = 100
-        else:
-            # Quase opaco: usar cor original ou clara
-            if self.bg_color == "#000000":
-                intensity = 140
+        """Atualiza a transparência da janela de forma controlada."""
+        try:
+            # Aplicar transparência à janela, mas manter um mínimo para visibilidade dos controles
+            alpha_value = max(0.7, self.transparency)  # Mínimo de 70% para manter controles visíveis
+            self.root.wm_attributes("-alpha", alpha_value)
+            
+            # Ajustar cor de fundo baseada na transparência para efeito visual
+            if self.transparency < 0.6:
+                # Alta transparência: fundo bem escuro
+                self.current_bg = "#0a0a0a"
+            elif self.transparency < 0.8:
+                # Transparência média: fundo escuro
+                self.current_bg = "#1a1a1a"  
             else:
-                # Usar cor configurada
+                # Baixa transparência: usar cor configurada
                 self.current_bg = self.bg_color
-                self._update_canvas_background()
-                return
+                
+            # Atualizar componentes
+            self._update_background_colors()
+                
+        except Exception as e:
+            print(f"Erro ao aplicar transparência: {e}")
+            # Fallback
+            self.current_bg = self.bg_color
+            self._update_background_colors()
 
-        # Criar cor baseada na intensidade
-        self.current_bg = f"#{intensity:02x}{intensity:02x}{intensity:02x}"
-
-        # Atualizar canvas e componentes
-        self._update_canvas_background()
-
-        # Atualizar widget de texto se existir
+    def _update_background_colors(self):
+        """Atualiza cores de fundo dos componentes."""
+        if hasattr(self, 'main_container'):
+            self.main_container.configure(bg=self.current_bg)
         if hasattr(self, 'text_widget'):
-            self.text_widget.configure(bg=self.current_bg)
+            self.text_widget.configure(bg=self.current_bg, fg=self.text_color)
 
     def _setup_ui(self):
         """Configura a interface do teleprompter."""
-        # Frame principal com borda no frame de fundo transparente
+        # Frame principal de conteúdo
         main_frame = tk.Frame(
-            self.bg_frame,
+            self.main_container,
             bg=self.current_bg,
             highlightbackground=self.border_color,
             highlightthickness=self.border_width
@@ -1024,7 +1007,7 @@ class TeleprompterWindow:
             controls_frame,
             text="📺 Teleprompter",
             font=(self.font_family, 14, "bold"),
-            bg=self.bg_color,
+            bg=self.current_bg,
             fg=self.text_color
         )
         title_label.pack(side="left")
@@ -1033,6 +1016,18 @@ class TeleprompterWindow:
         config_frame = tk.Frame(controls_frame, bg=self.current_bg)
         config_frame.pack(side="right")
         self.config_frame = config_frame  # Guardar referência
+
+        # Botão de transparência (bem visível)
+        transparency_btn = tk.Button(
+            config_frame, 
+            text="👁️", 
+            command=self._toggle_transparency,
+            bg="#333333", 
+            fg="white", 
+            width=4,
+            font=(self.font_family, 12, "bold")
+        )
+        transparency_btn.pack(side="left", padx=2)
 
         # Tamanho da fonte
         tk.Label(config_frame, text="Fonte:", bg=self.current_bg, fg=self.text_color).pack(side="left")
@@ -1123,6 +1118,14 @@ class TeleprompterWindow:
             self.transparency -= 0.1
             self._update_transparency()
 
+    def _toggle_transparency(self):
+        """Alterna entre alta e baixa transparência rapidamente."""
+        if self.transparency > 0.8:
+            self.transparency = 0.5  # Mais transparente
+        else:
+            self.transparency = 0.9  # Menos transparente
+        self._update_transparency()
+
     def _change_colors(self):
         """Abre diálogo para mudar cores."""
         from tkinter import colorchooser
@@ -1157,9 +1160,9 @@ class TeleprompterWindow:
         if hasattr(self, 'text_widget'):
             self.text_widget.config(bg=self.current_bg, fg=self.text_color, insertbackground=self.text_color)
 
-        # Atualizar canvas e frames principais
-        if hasattr(self, 'bg_canvas'):
-            self._update_canvas_background()
+        # Atualizar containers e frames principais
+        if hasattr(self, 'main_container'):
+            self.main_container.configure(bg=self.current_bg)
         if hasattr(self, 'main_frame'):
             self.main_frame.configure(bg=self.current_bg)
         if hasattr(self, 'controls_frame'):
