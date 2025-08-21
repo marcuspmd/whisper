@@ -1,0 +1,10 @@
+
+faster-whisper==1.2.0
+googletrans==4.0.0-rc1
+sounddevice==0.4.6
+soundfile==0.12.1
+numpy>=1.23
+
+webrtcvad==2.0.10
+# Pin setuptools para evitar o warning do pkg_resources usado por some wheels (temporário)
+setuptools<81
