@@ -16,8 +16,9 @@ logger = logging.getLogger(__name__)
 class DesktopInterface:
     """Interface desktop usando Tkinter."""
 
-    def __init__(self, config, transcription_manager=None):
+    def __init__(self, config, transcription_manager=None, config_manager=None):
         self.config = config
+        self.config_manager = config_manager  # Para salvar configurações
         self.transcription_manager = transcription_manager
         self.app = None  # WhisperApplication será definida depois
 
@@ -365,7 +366,7 @@ class DesktopInterface:
         )
 
         # Definir valor atual
-        current_device = getattr(self.config.audio, "device_index", None)
+        current_device = getattr(self.config.audio, "device_id", None)
         if current_device is not None:
             for idx, (device_id, device_info) in enumerate(self.available_devices):
                 if device_id == current_device:
@@ -748,7 +749,10 @@ class DesktopInterface:
             device_text = self.device_var.get()
             for device_id, device_info in self.available_devices:
                 if device_info == device_text:
-                    self.config.audio.device_index = device_id
+                    self.config.audio.device_id = device_id
+                    # Também define o device_name para debug
+                    device_name = device_info.split(": ", 1)[1] if ": " in device_info else device_info
+                    self.config.audio.device_name = device_name
                     break
 
             # Modelo
@@ -785,10 +789,18 @@ class DesktopInterface:
             # Atualizar display
             self._update_current_config_display()
 
+            # Salvar configurações no arquivo
+            if self.config_manager:
+                try:
+                    self.config_manager.save()
+                    logger.info("Configurações salvas no arquivo")
+                except Exception as e:
+                    logger.error(f"Erro ao salvar configurações: {e}")
+
             # Mostrar confirmação
             messagebox.showinfo(
                 "Configurações",
-                "Configurações aplicadas com sucesso!\n\nAs novas configurações serão usadas na próxima transcrição.",
+                "Configurações aplicadas e salvas com sucesso!\n\nAs novas configurações serão usadas na próxima transcrição.",
             )
 
         except Exception as e:
@@ -799,7 +811,7 @@ class DesktopInterface:
         """Atualiza o display das configurações atuais."""
         try:
             model = getattr(self.config.transcription, "model_name", "unknown")
-            device = getattr(self.config.audio, "device_index", "auto")
+            device = getattr(self.config.audio, "device_id", "auto")
             lang = getattr(self.config.transcription, "language", None) or "auto"
             translate = getattr(self.config.translation, "enabled", False)
             target_lang = getattr(self.config.translation, "target_language", "pt")

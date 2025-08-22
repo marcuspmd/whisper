@@ -5,7 +5,12 @@ Transcrição e tradução de áudio em tempo real com interface interativa
 """
 import argparse
 import sys
+import multiprocessing as mp
 from pathlib import Path
+
+# Configura multiprocessing para evitar problemas no macOS com interfaces gráficas
+if sys.platform == "darwin":  # macOS
+    mp.set_start_method("fork", force=True)
 
 # Adiciona src ao path para imports
 src_path = Path(__file__).parent / "src"
@@ -24,10 +29,10 @@ def create_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Exemplos de uso:
-  python main.py                                    # Modo interativo padrão
+  python main.py                                    # Modo GUI (padrão)
   python main.py --list-devices                     # Lista dispositivos de áudio
   python main.py --model small --language pt        # Modelo small, força português
-  python main.py --no-translate --simple            # Apenas transcrição, modo console simples
+  python main.py --console --no-translate           # Força modo console sem tradução
   python main.py --device-id 2 --translate-mode google  # Dispositivo específico, Google Translate
         """,
     )
@@ -120,14 +125,14 @@ Exemplos de uso:
     # Interface
     ui_group = parser.add_argument_group("Configurações de Interface")
     ui_group.add_argument(
-        "--simple",
+        "--console",
         action="store_true",
-        help="Modo console simples (sem interface interativa)",
+        help="Força modo console (fallback sem GUI)",
     )
     ui_group.add_argument(
         "--gui",
         action="store_true",
-        help="Inicia interface desktop (aplicativo com janela)",
+        help="Inicia interface desktop (aplicativo com janela) - PADRÃO",
     )
     ui_group.add_argument(
         "--teleprompter",
@@ -194,9 +199,7 @@ def apply_cli_args_to_config(args, config_manager):
     if args.target_language:
         config.translation.target_language = args.target_language
 
-    # Interface
-    if args.simple:
-        config.ui.interactive_mode = False
+    # Interface - removido args.simple (não existe mais)
     if args.log_level:
         config.ui.log_level = args.log_level
     if args.no_color:
@@ -256,7 +259,7 @@ def main():
             app = create_app(use_simple_ui=True, headless=True)
 
             # Cria interface desktop
-            desktop_interface = DesktopInterface(config_manager.config)
+            desktop_interface = DesktopInterface(config_manager.config, config_manager=config_manager)
 
             # Conecta interface desktop à aplicação
             app.set_desktop_interface(desktop_interface)
@@ -289,14 +292,42 @@ def main():
                 print("\n👋 Interrupção recebida, finalizando...")
             except Exception as e:
                 print(f"\n❌ Erro: {e}")
-        else:
-            # Modo terminal (simples ou interativo)
-            use_simple = args.simple or not config_manager.config.ui.interactive_mode
-            app = create_app(use_simple_ui=use_simple)
+        elif args.console:
+            # Modo console forçado (fallback)
+            print("🖥️ Executando em modo console...")
+            app = create_app(use_simple_ui=True, headless=False)
 
             # Executa aplicação
             success = app.run()
             return 0 if success else 1
+        else:
+            # Modo padrão: tenta GUI primeiro, console como fallback
+            try:
+                print("🖥️ Iniciando interface desktop...")
+
+                import threading
+                from src.ui.desktop import DesktopInterface
+
+                # Cria aplicação em modo headless (sem interface terminal)
+                app = create_app(use_simple_ui=True, headless=True)
+
+                # Cria interface desktop
+                desktop_interface = DesktopInterface(config_manager.config)
+
+                # Conecta interface desktop à aplicação
+                app.set_desktop_interface(desktop_interface)
+                desktop_interface.set_app(app)
+
+                # Executa interface desktop (bloqueia até janela fechar)
+                desktop_interface.run()
+
+            except Exception as e:
+                print(f"⚠️ Não foi possível iniciar GUI: {e}")
+                print("🖥️ Executando em modo console fallback...")
+
+                app = create_app(use_simple_ui=True, headless=False)
+                success = app.run()
+                return 0 if success else 1
 
     except KeyboardInterrupt:
         print("\n👋 Até logo!")

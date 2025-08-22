@@ -26,8 +26,8 @@ from .audio.capture import AudioCapture, VADAudioCapture
 from .audio.device_manager import AudioDeviceManager
 from .config.settings import get_config_manager
 from .transcription.whisper_engine import WhisperTranscriber
+from .transcription.async_processor import AsyncTranscriptionProcessor
 from .translation.engines import TranslationManager
-from .ui.simple import create_interactive_console
 from .utils.logger import setup_colored_logging
 
 logger = logging.getLogger(__name__)
@@ -47,6 +47,7 @@ class WhisperApplication:
         self.audio_capture = None
         self.transcriber = None
         self.translation_manager = None
+        self.async_processor = None  # Processador assíncrono para evitar perda de áudio
         # Interface de usuário
         self.ui_interface = None
         self.desktop_interface = None
@@ -189,7 +190,7 @@ class WhisperApplication:
                 )
 
             # Atualiza UI com nome do dispositivo
-            if self.ui:
+            if hasattr(self, 'ui') and self.ui:
                 self.ui.set_audio_device(device_name)
 
             return True
@@ -240,6 +241,22 @@ class WhisperApplication:
             logger.error(f"Erro ao configurar tradução: {e}")
             return False
 
+    def _setup_async_processor(self) -> bool:
+        """Configura processador assíncrono de transcrição"""
+        try:
+            self.async_processor = AsyncTranscriptionProcessor(
+                transcriber=self.transcriber,
+                translation_manager=self.translation_manager,
+                ui=self.ui,
+                desktop_interface=self.desktop_interface
+            )
+            logger.info("Processador assíncrono configurado")
+            return True
+
+        except Exception as e:
+            logger.error(f"Erro ao configurar processador assíncrono: {e}")
+            return False
+
     def _setup_ui(self) -> bool:
         """Configura interface do usuário"""
         try:
@@ -247,16 +264,12 @@ class WhisperApplication:
                 # Modo headless - sem interface terminal
                 self.ui = None
                 logger.info("Modo headless - sem interface terminal")
-            elif not self.use_simple_ui:
-                from .ui.interactive import InteractiveConsole
-
-                self.ui = InteractiveConsole(self.config)
-                logger.info("Interface interativa configurada")
             else:
-                from .ui.simple import SimpleConsole
+                # Usa apenas console fallback minimalista para casos extremos
+                from .ui.console_fallback import ConsoleFallback
 
-                self.ui = SimpleConsole(self.config)
-                logger.info("Modo console simples")
+                self.ui = ConsoleFallback(self.config)
+                logger.info("Interface console fallback configurada")
 
             return True
 
@@ -278,6 +291,7 @@ class WhisperApplication:
         """Loop de monitoramento de áudio"""
         last_transcription_time = 0
         speech_start_time = None
+        silence_start_time = None  # Nova variável para rastrear silêncio
 
         while not self.stop_event.is_set():
             try:
@@ -306,30 +320,43 @@ class WhisperApplication:
                         if speech_start_time is None:
                             speech_start_time = current_time
 
+                        # Reset do silence_start quando há fala
+                        silence_start_time = None
+
                         # Aguarda acumular pelo menos 2 segundos de fala antes de transcrever
                         if current_time - speech_start_time >= 2.0:
                             # Cooldown: aguarda pelo menos 1 segundo desde a última transcrição
                             if current_time - last_transcription_time >= 1.0:
                                 # Obtém chunk maior para transcrição
                                 chunk_duration = getattr(
-                                    self.config.audio, "vad_chunk_seconds", 2.5
+                                    self.config.audio, "vad_chunk_seconds", 3.5
                                 )
                                 audio_chunk = self.audio_capture.get_audio_chunk(
                                     chunk_duration
                                 )
 
                                 if audio_chunk is not None and len(audio_chunk) > 0:
-                                    self._process_transcription(audio_chunk)
-                                    last_transcription_time = current_time
-                                    speech_start_time = (
-                                        None  # Reset para próxima detecção
-                                    )
+                                    # Usa processador assíncrono para evitar perda de áudio
+                                    if self.async_processor and self.async_processor.add_audio_chunk(
+                                        audio_chunk, self.config.audio.sample_rate
+                                    ):
+                                        last_transcription_time = current_time
+                                        # NÃO reseta speech_start_time aqui - mantém capturando
+                                        logger.debug(f"Chunk enviado para processamento, mantendo detecção ativa")
+                                    else:
+                                        logger.warning("Falha ao adicionar chunk ao processador assíncrono")
                     else:
                         # Sem fala detectada
                         if speech_start_time is not None:
-                            # Se estava falando e parou, aguarda um pouco antes de resetar
-                            if current_time - speech_start_time >= 3.0:
+                            # Começa a contar silêncio
+                            if silence_start_time is None:
+                                silence_start_time = current_time
+
+                            # Só reseta após 2 segundos contínuos de silêncio
+                            elif current_time - silence_start_time >= 2.0:
+                                logger.debug(f"Silêncio por 2s, resetando detecção de fala")
                                 speech_start_time = None
+                                silence_start_time = None
 
                     time.sleep(0.1)  # Verifica a cada 100ms
 
@@ -364,9 +391,13 @@ class WhisperApplication:
                     ):
                         continue
 
-                    # Processa transcrição
-                    self._process_transcription(audio_chunk)
-                    last_transcription_time = current_time
+                    # Processa transcrição usando processador assíncrono
+                    if self.async_processor and self.async_processor.add_audio_chunk(
+                        audio_chunk, self.config.audio.sample_rate
+                    ):
+                        last_transcription_time = current_time
+                    else:
+                        logger.warning("Falha ao adicionar chunk ao processador assíncrono")
 
             except Exception as e:
                 logger.error(f"Erro no loop de áudio: {e}")
@@ -467,7 +498,10 @@ class WhisperApplication:
 
         logger.info("Iniciando Whisper Transcriber...")
 
-        # Setup dos componentes
+        # Setup dos componentes (UI primeiro para que _setup_audio possa referenciá-la)
+        if not self._setup_ui():
+            return False
+
         if not self._setup_audio():
             return False
 
@@ -477,7 +511,7 @@ class WhisperApplication:
         if not self._setup_translation():
             return False
 
-        if not self._setup_ui():
+        if not self._setup_async_processor():
             return False
 
         # Inicia captura de áudio
@@ -487,6 +521,10 @@ class WhisperApplication:
 
         self.is_running = True
         self.stop_event.clear()
+
+        # Inicia processador assíncrono
+        if self.async_processor:
+            self.async_processor.start()
 
         # Inicia UI
         if self.ui:
@@ -518,6 +556,10 @@ class WhisperApplication:
         # Para captura de áudio
         if self.audio_capture:
             self.audio_capture.stop()
+
+        # Para processador assíncrono
+        if self.async_processor:
+            self.async_processor.stop()
 
         # Para UI
         if self.ui:
